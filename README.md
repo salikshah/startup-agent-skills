@@ -1,15 +1,23 @@
 <p align="center">
-  <img src="Startup%20Agent%20Skills%20by%20Salik%20Shah.png" alt="Startup Agent Skills by Salik Shah" width="100%">
+  <img src="Startup%20Agent%20Skills%20by%20Salik%20Shah%20v2.png" alt="Startup Agent Skills by Salik Shah" width="100%">
 </p>
 
-# Startup Agent Skills
+<h1 align="center">Startup Agent Skills</h1>
 
-[![Agent Skills Spec](https://img.shields.io/badge/spec-agentskills.io-blue.svg)](https://agentskills.io/specification.md)
-[![CI Validation](https://img.shields.io/badge/CI-passing-success.svg)](.github/workflows/validate-skills.yml)
-[![Benchmark Score](https://img.shields.io/badge/benchmark-100%25%20pass%20rate-brightgreen.svg)](docs/BENCHMARKS.md)
-[![License: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](LICENSE)
+<p align="center">
+  <a href="https://agentskills.io/specification.md"><img src="https://img.shields.io/badge/spec-agentskills.io-blue.svg" alt="Agent Skills Spec"></a>
+  <a href=".github/workflows/validate-skills.yml"><img src="https://img.shields.io/badge/CI-passing-success.svg" alt="CI Validation"></a>
+  <a href="docs/BENCHMARKS.md"><img src="https://img.shields.io/badge/benchmark-100%25%20pass%20rate-brightgreen.svg" alt="Benchmark Score"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-informational.svg" alt="License: MIT"></a>
+  <a href="https://salikshah.com"><img src="https://img.shields.io/badge/web-salikshah.com-4F46E5?style=flat&logo=googlechrome&logoColor=white" alt="Website"></a>
+  <a href="https://x.com/salik"><img src="https://img.shields.io/badge/𝕏-@salik-000000?style=flat&logo=x&logoColor=white" alt="X / Twitter"></a>
+  <a href="https://linkedin.com/in/salikshah"><img src="https://img.shields.io/badge/LinkedIn-SalikShah-0A66C2?style=flat&logo=linkedin&logoColor=white" alt="LinkedIn"></a>
+</p>
 
-**Executable, benchmarked Agent Skills for startup strategy, growth, and positioning. CI-gated for Antigravity, Codex, Claude Code, Cursor, Opencode, Hermes & others.**
+<p align="center">
+  <strong>Executable, benchmarked Agent Skills for startup strategy, growth, and positioning.</strong><br>
+  CI-gated for Antigravity, Codex, Claude Code, Cursor, Opencode, Hermes &amp; others.
+</p>
 
 Fourteen executable, CI-gated skills that turn AI coding agents into strategic startup operators. Built on the [Agent Skills specification](https://agentskills.io/specification.md), each skill is a structured SOP distilled from the canonical startup literature (Eric Ries, Gabriel Weinberg, Sean Ellis, Cal Newport, Bharat Anand).
 
