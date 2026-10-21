@@ -5,11 +5,11 @@
 [![Benchmark Score](https://img.shields.io/badge/benchmark-100%25%20pass%20rate-brightgreen.svg)](docs/BENCHMARKS.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-informational.svg)](LICENSE)
 
-**Executable, benchmarked Agent Skills for startup strategy, growth, and positioning. CI-gated for Antigravity, Claude Code, Cursor, Opencode, Hermes & others.**
+**Executable, benchmarked Agent Skills for startup strategy, growth, and positioning. CI-gated for Antigravity, Codex, Claude Code, Cursor, Opencode, Hermes & others.**
 
 Fourteen executable, CI-gated skills that turn AI coding agents into strategic startup operators. Built on the [Agent Skills specification](https://agentskills.io/specification.md), each skill is a structured SOP distilled from the canonical startup literature (Eric Ries, Gabriel Weinberg, Sean Ellis, Cal Newport, Bharat Anand).
 
-Compatible with **Antigravity**, **Claude Code**, **Cursor**, **Opencode**, **Hermes**, **Codex**, and any autonomous agent runtime.
+Compatible with **Antigravity**, **Codex**, **Claude Code**, **Cursor**, **Opencode**, **Hermes**, and any autonomous agent runtime.
 
 ---
 
