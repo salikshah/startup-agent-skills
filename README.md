@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Startup%20Agent%20Skills%20by%20Salik%20Shah.png" alt="Startup Agent Skills by Salik Shah" width="100%">
+</p>
+
 # Startup Agent Skills
 
 [![Agent Skills Spec](https://img.shields.io/badge/spec-agentskills.io-blue.svg)](https://agentskills.io/specification.md)
