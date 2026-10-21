@@ -1,0 +1,52 @@
+{
+  "skill_name": "lean-startup-method",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I run a SaaS with 40% trial-to-paid. Should I build feature X or test whether customers will pay for it first?",
+      "expected_output": "Applies the Build-Measure-Learn loop: identify the riskiest assumption, define an MVP that tests it, set the metric before building, and decide pivot or persevere from cohort data.",
+      "assertions": [
+        "Identifies the riskiest assumption as the value hypothesis",
+        "Defines an MVP that tests a single assumption",
+        "Specifies a metric to measure before building",
+        "Explains pivot versus persevere",
+        "Warns against measuring vanity metrics"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Our MVP got 500 signups and 2 purchases. Is that validation?",
+      "expected_output": "Treats the result as inconclusive or invalidated. Cohort conversion of 0.4% is far below a working paid product. The response should avoid declaring victory and recommend a pivot or a sharper test.",
+      "assertions": [
+        "Does not declare the MVP validated",
+        "Uses cohort-based conversion rather than a vanity count",
+        "States the result is invalidated or inconclusive",
+        "Recommends a pivot or a sharper test"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Help me design the perfect feature roadmap for next year.",
+      "expected_output": "Declines to produce a fixed roadmap. The skill tests hypotheses, so it should propose prioritized experiments and a learning log instead.",
+      "assertions": [
+        "Recognizes the request is out of scope for the skill",
+        "Proposes prioritized experiments instead of a fixed roadmap",
+        "Mentions a learning log or documented hypotheses"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "I pivoted once already. Should I pivot again or persevere?",
+      "expected_output": "Frames the pivot as a strategic redirection and bases the decision on cohort evidence rather than frustration.",
+      "assertions": [
+        "Frames a pivot as a strategic redirection",
+        "Bases the decision on cohort data",
+        "Warns against pivoting on inconclusive data"
+      ],
+      "files": []
+    }
+  ]
+}

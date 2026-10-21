@@ -1,0 +1,40 @@
+{
+  "skill_name": "ai-native-build-log",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "How do I write a build log for a feature I built with an AI coding agent?",
+      "expected_output": "Follows the six steps: define the target, map the stack, write the prompt first, orchestrate agents, iterate with evals, and document the log with metrics.",
+      "assertions": [
+        "Defines the build target first",
+        "Maps the AI-native stack",
+        "Writes the prompt before the code",
+        "Records iterations and metrics",
+        "Shows what the human edited and why"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Can I claim a build was AI-native if I only used autocomplete?",
+      "expected_output": "No. The skill warns against claiming AI-native when AI was not used, and against hiding the human judgment layer.",
+      "assertions": [
+        "Warns against claiming AI-native without real AI use",
+        "Requires showing the human judgment layer",
+        "Requires metrics, because claims without them are not proof"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Should I publish my prompts?",
+      "expected_output": "Recommends publishing sanitized prompts with the result and metrics, so the log is reproducible and auditable.",
+      "assertions": [
+        "Recommends publishing sanitized prompts",
+        "Includes metrics such as time saved and iterations",
+        "Keeps the log reproducible and auditable"
+      ],
+      "files": []
+    }
+  ]
+}

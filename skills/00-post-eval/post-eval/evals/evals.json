@@ -1,0 +1,54 @@
+{
+  "skill_name": "post-eval",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Evaluate this tweet: 'Just shipped v2 of our open-source content engine. 14 skills, each spec-validated, benchmarked, and eval-tested. Link in replies.'",
+      "expected_output": "A verdict (POST or DON'T POST), a score out of 100, pros, cons, a strategic analysis, gaps, and a recommendation. The post has a link, a concrete claim, and a shipped result, so it should score well on proof of work.",
+      "assertions": [
+        "Returns a POST or DON'T POST verdict",
+        "Gives a numeric score out of 100",
+        "Lists pros and cons",
+        "Identifies the link and the shipped result as proof of work",
+        "States a recommendation"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Should I post: 'I'm building an AI content system. Coming soon.'?",
+      "expected_output": "A DON'T POST verdict. The post announces intent, has no artefact, no number, and no CTA. The recommendation should be to ship something linkable first.",
+      "assertions": [
+        "Returns a DON'T POST verdict",
+        "Flags that the post announces intent instead of showing work",
+        "Notes the missing artefact, number, or CTA",
+        "Recommends shipping a linkable artefact before posting"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Evaluate a LinkedIn post that is 1,900 characters long and says: 'Our tool will 10x your output, guaranteed.'",
+      "expected_output": "A low risk score. The post is over the LinkedIn limit and makes an unkeepable promise. The output should flag both length and overpromising.",
+      "assertions": [
+        "Flags the post as over the LinkedIn character limit",
+        "Flags the guarantee or overpromise as a risk",
+        "Scores risk lower because of the promise",
+        "Recommends tightening the claim"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "Evaluate this post: 'Most skill libraries stop at prose. Ours is provable.'",
+      "expected_output": "A weak post. It makes a comparative claim with no evidence, no link, and no number. The gap should be a concrete artefact or metric.",
+      "assertions": [
+        "Flags the unsupported comparative claim",
+        "Notes the missing link or number",
+        "Identifies a concrete artefact as a gap",
+        "Does not award a POST verdict without evidence"
+      ],
+      "files": []
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "skill_name": "business-plan-template",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need an investor-ready business plan. What goes in it?",
+      "expected_output": "Follows the ten steps: executive summary last, problem and opportunity, solution, bottom-up market sizing, competitors, business model, go-to-market, team, financial projections, and the funding ask.",
+      "assertions": [
+        "Writes the executive summary last",
+        "Uses bottom-up market sizing for TAM, SAM, SOM",
+        "Analyzes competitors instead of claiming none",
+        "Builds 3-year financial projections with assumptions",
+        "Specifies the funding ask and use of proceeds"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Can I say my TAM is $50B because the industry is huge?",
+      "expected_output": "No. The plan must justify TAM bottom-up with target customers times revenue per customer.",
+      "assertions": [
+        "Rejects an unsupported top-down TAM",
+        "Requires bottom-up reasoning",
+        "Multiplies target customers by revenue per customer"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Should I claim we have no competitors?",
+      "expected_output": "No. Claiming no competitors signals naivety. The plan maps direct, indirect, and substitute competitors.",
+      "assertions": [
+        "Advises against claiming no competitors",
+        "Maps direct, indirect, and substitute competitors",
+        "Identifies an unfair advantage and barriers to entry"
+      ],
+      "files": []
+    }
+  ]
+}

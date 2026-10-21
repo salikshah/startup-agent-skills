@@ -1,0 +1,39 @@
+{
+  "skill_name": "scaling-up-framework",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We're a 40-person company and growth has stalled. What's the framework?",
+      "expected_output": "Diagnoses which of People, Strategy, Execution, or Cash is the bottleneck, then addresses the disciplines in priority order with the One-Page Strategic Plan, quarterly rocks, meeting rhythm, and cash forecast.",
+      "assertions": [
+        "Diagnoses the primary bottleneck among People, Strategy, Execution, Cash",
+        "Addresses the disciplines in priority order",
+        "Mentions the One-Page Strategic Plan and quarterly rocks",
+        "Mentions a meeting rhythm and a cash forecast"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "How many quarterly rocks should we set?",
+      "expected_output": "Recommends 3 to 5 rocks per company and per person. More than five fragments focus.",
+      "assertions": [
+        "Recommends 3 to 5 rocks",
+        "Warns against more than five rocks",
+        "Explains that focus fragments with too many priorities"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Should we manage cash annually or weekly?",
+      "expected_output": "Recommends weekly cash monitoring with a 13-week rolling forecast. Cash crises emerge without warning.",
+      "assertions": [
+        "Recommends weekly cash monitoring",
+        "Recommends a 13-week rolling forecast",
+        "Warns that annual cash management misses crises"
+      ],
+      "files": []
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "skill_name": "acquisition-readiness-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We might sell in 18 months. How do we prepare?",
+      "expected_output": "Runs the ten-step audit: identify buyers, assess valuation drivers, clean the cap table, audit IP, organize financials and contracts, build a data room, address red flags, and engage an advisor.",
+      "assertions": [
+        "Identifies strategic and financial buyers",
+        "Assesses valuation drivers such as growth, margin, and retention",
+        "Cleans the cap table and audits IP assignment",
+        "Builds a data room and addresses red flags",
+        "Recommends engaging an M&A advisor"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "One customer is 35% of our revenue. Is that a problem?",
+      "expected_output": "Flags customer concentration above 20% as a deal-killer and recommends mitigation before diligence.",
+      "assertions": [
+        "Flags customer concentration as a red flag",
+        "Uses a threshold around 20% of revenue",
+        "Recommends mitigating concentration before diligence"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Can we wait until a buyer approaches to prepare?",
+      "expected_output": "Advises preparing early. Waiting removes leverage and leaves no time to fix cap table, IP, or financial issues.",
+      "assertions": [
+        "Advises preparing before a buyer approaches",
+        "Explains that waiting removes leverage",
+        "Notes that cap table and IP issues take time to fix"
+      ],
+      "files": []
+    }
+  ]
+}

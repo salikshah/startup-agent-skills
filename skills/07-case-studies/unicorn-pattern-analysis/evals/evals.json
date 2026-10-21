@@ -1,0 +1,39 @@
+{
+  "skill_name": "unicorn-pattern-analysis",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "How do I find patterns in unicorn startups?",
+      "expected_output": "Selects 10 to 20 adjacent case studies and documents founding dates, funding patterns, category creation, founder-market fit, timing windows, and distribution channels.",
+      "assertions": [
+        "Selects 10 to 20 case studies",
+        "Documents founding dates and funding patterns",
+        "Analyzes category creation and timing windows",
+        "Extracts distribution insights"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "We found that most unicorns raised a Series C. Does raising cause success?",
+      "expected_output": "Rejects the causal claim. Raising a round does not cause unicorn status, and the skill warns about survivorship bias and correlation versus causation.",
+      "assertions": [
+        "Rejects the causal claim",
+        "Warns about survivorship bias",
+        "Distinguishes correlation from causation"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Can I copy a 2015 playbook in 2026?",
+      "expected_output": "Warns to check whether the market timing window is still open before replicating an old playbook.",
+      "assertions": [
+        "Warns against copying an old playbook without checking timing",
+        "Checks whether the timing window is still open",
+        "Recommends examining structural conditions"
+      ],
+      "files": []
+    }
+  ]
+}

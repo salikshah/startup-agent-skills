@@ -1,0 +1,39 @@
+{
+  "skill_name": "aeo-geo-playbook",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "How do we start improving our visibility in ChatGPT and Perplexity?",
+      "expected_output": "Runs the five-phase playbook starting with a baseline audit across the major engines, recording mentions, citations, and sources.",
+      "assertions": [
+        "Starts with a baseline audit across AI engines",
+        "Records whether the brand is mentioned and what sources are cited",
+        "Captures screenshots and timestamps",
+        "Identifies gaps against competitors"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Is AEO just SEO with a new name?",
+      "expected_output": "Distinguishes the two: AEO optimizes for citation by AI engines, not for keyword rank. It mentions llms.txt, schema, and answer-ready structure.",
+      "assertions": [
+        "Distinguishes AEO from SEO",
+        "States that the optimization target is citation",
+        "Mentions llms.txt, schema, or answer-ready structure"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "We published 10 articles. Are we done?",
+      "expected_output": "Points to the measurement phase. Done means tracking AI mention rate, citations, and AI-source traffic weekly, not just publishing.",
+      "assertions": [
+        "Requires ongoing measurement after publishing",
+        "Tracks AI mention rate and citation count",
+        "Tracks traffic and conversion from AI sources"
+      ],
+      "files": []
+    }
+  ]
+}

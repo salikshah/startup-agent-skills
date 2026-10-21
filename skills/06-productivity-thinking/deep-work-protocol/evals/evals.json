@@ -1,0 +1,40 @@
+{
+  "skill_name": "deep-work-protocol",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I get 45 minutes of deep work a day. How do I get more?",
+      "expected_output": "Audits the week, picks a depth scheduling philosophy, designs a ritual, blocks the calendar, and manages attention residue.",
+      "assertions": [
+        "Audits current time use first",
+        "Chooses a depth scheduling philosophy",
+        "Designs a ritual with location, duration, and rules",
+        "Blocks the calendar for deep work",
+        "Addresses attention residue when switching tasks"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Should I check email before my deep work block?",
+      "expected_output": "Advises against it. Checking email creates attention residue that degrades focus for 15 to 20 minutes.",
+      "assertions": [
+        "Advises against checking email before deep work",
+        "Explains attention residue",
+        "Recommends a transition buffer between shallow and deep work"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "How many deep hours should I aim for each week?",
+      "expected_output": "Targets 15 to 20+ deep hours per week and trains focus gradually, extending sessions by 10 to 15 minutes per week.",
+      "assertions": [
+        "Targets 15 to 20+ deep hours per week",
+        "Recommends training focus gradually",
+        "Extends sessions incrementally"
+      ],
+      "files": []
+    }
+  ]
+}

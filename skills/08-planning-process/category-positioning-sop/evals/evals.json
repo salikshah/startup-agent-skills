@@ -1,0 +1,40 @@
+{
+  "skill_name": "category-positioning-sop",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We're an AI wrapper. How do we become a category leader?",
+      "expected_output": "Runs the Wrapper Test, finds a constraint outside the model, designs the category narrative, writes a one-liner, builds a proof stack, and distributes the narrative.",
+      "assertions": [
+        "Runs the Wrapper Test",
+        "Finds a constraint outside the model",
+        "Designs the category narrative and a one-liner",
+        "Builds a proof stack with receipts",
+        "Plans distribution across channels"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Can a technical user get 80% of our output by pasting our prompt into a general model?",
+      "expected_output": "Yes, that means the product is a wrapper. The response should say so and point to the Wrapper Test criteria.",
+      "assertions": [
+        "Identifies the product as a wrapper",
+        "References the Wrapper Test criteria",
+        "Recommends finding a constraint outside the model"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "What belongs in our positioning one-liner?",
+      "expected_output": "The target customer, the outcome, the unique mechanism, and a proof metric.",
+      "assertions": [
+        "Includes the target customer",
+        "Includes the outcome and unique mechanism",
+        "Ends with a proof metric"
+      ],
+      "files": []
+    }
+  ]
+}

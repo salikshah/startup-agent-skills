@@ -1,0 +1,40 @@
+{
+  "skill_name": "content-strategy-framework",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We keep producing more content and engagement is flat. What's wrong?",
+      "expected_output": "Diagnoses the content traps (better content, more content, mimicking) and shifts to bundling, linking, and network effects.",
+      "assertions": [
+        "Identifies which content trap applies",
+        "Shifts from quality or volume to bundling and linking",
+        "Mentions network effects",
+        "Recommends measuring connection-driven metrics"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Should we compete on content quality?",
+      "expected_output": "Cautions against competing on quality alone when competitors have equal or greater resources, and points to linking and bundling instead.",
+      "assertions": [
+        "Warns against competing on quality alone",
+        "Recommends bundling and linking instead",
+        "Notes that a well-linked average strategy can outperform isolated premium content"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "How do we measure whether our content strategy works?",
+      "expected_output": "Measures connection-driven metrics: cross-content engagement, bundle uptake, and churn among linked-content consumers, not page views.",
+      "assertions": [
+        "Tracks cross-content engagement",
+        "Tracks bundle versus standalone uptake",
+        "Compares churn between linked and isolated content consumers",
+        "Avoids vanity metrics such as page views"
+      ],
+      "files": []
+    }
+  ]
+}

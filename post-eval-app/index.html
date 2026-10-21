@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PostEval — Tweet &amp; LinkedIn Post Evaluator</title>
+<style>
+  :root {
+    --bg: #eef1f6;
+    --card: #ffffff;
+    --ink: #16181d;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --accent: #4f46e5;
+    --accent-soft: #eef0ff;
+    --green: #16a34a;
+    --green-soft: #e8f7ee;
+    --red: #dc2626;
+    --red-soft: #fdecec;
+    --amber: #d97706;
+    --amber-soft: #fdf3e3;
+    --radius: 14px;
+    --shadow: 0 1px 3px rgba(16,24,40,.06), 0 8px 24px rgba(16,24,40,.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  header.hero {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 22px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 20px;
+    box-shadow: var(--shadow);
+  }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -.02em; }
+  .sub { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .pill {
+    font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    color: var(--accent); background: var(--accent-soft); padding: 6px 11px; border-radius: 999px;
+  }
+
+  .grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 20px; align-items: start; }
+  @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px;
+  }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 14px; }
+
+  .field-label { font-size: 13px; font-weight: 600; margin-bottom: 7px; display: block; }
+
+  .seg { display: inline-flex; background: #f1f2f6; border-radius: 10px; padding: 4px; gap: 4px; margin-bottom: 14px; }
+  .seg button {
+    border: 0; background: transparent; padding: 7px 14px; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: var(--muted); font-family: inherit;
+  }
+  .seg button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(16,24,40,.12); }
+
+  textarea {
+    width: 100%; min-height: 210px; resize: vertical; padding: 13px 14px;
+    border: 1px solid var(--line); border-radius: 10px; font-family: inherit; font-size: 14.5px;
+    color: var(--ink); background: #fcfcfd; outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,70,229,.12); background: #fff; }
+
+  .meta-row { display: flex; justify-content: space-between; align-items: center; margin-top: 9px; font-size: 12.5px; color: var(--muted); }
+  .char-warn { color: var(--amber); font-weight: 600; }
+  .char-over { color: var(--red); font-weight: 700; }
+
+  .btn {
+    border: 0; cursor: pointer; font-family: inherit; font-weight: 700; font-size: 14.5px;
+    padding: 12px 18px; border-radius: 10px; transition: transform .05s, filter .15s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; margin-top: 16px; }
+  .btn-primary:hover { filter: brightness(1.07); }
+  .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-ghost { background: #f1f2f6; color: var(--muted); }
+  .btn-ghost:hover { background: #e9ebf0; }
+
+  /* result */
+  .empty {
+    border: 1.5px dashed var(--line); border-radius: 12px; padding: 46px 20px;
+    text-align: center; color: var(--muted); font-size: 14px;
+  }
+  .empty .big { font-size: 30px; margin-bottom: 8px; }
+
+  .result-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .verdict {
+    font-size: 15px; font-weight: 800; letter-spacing: .02em; padding: 9px 16px; border-radius: 999px; text-transform: uppercase;
+  }
+  .verdict.post { background: var(--green-soft); color: var(--green); }
+  .verdict.nopost { background: var(--red-soft); color: var(--red); }
+
+  .gauge-wrap { display: flex; align-items: center; gap: 16px; }
+  .gauge { position: relative; width: 86px; height: 86px; flex: 0 0 auto; }
+  .gauge svg { transform: rotate(-90deg); }
+  .gauge .val {
+    position: absolute; inset: 0; display: grid; place-items: center; text-align: center;
+  }
+  .gauge .val b { font-size: 20px; line-height: 1; }
+  .gauge .val span { font-size: 10px; color: var(--muted); }
+  .platform-tag { font-size: 11.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+
+  .scorebar { height: 8px; border-radius: 999px; background: #eef0f4; overflow: hidden; margin: 14px 0 4px; }
+  .scorebar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #4f46e5, #7c3aed); }
+
+  .cats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 16px 0 4px; }
+  @media (max-width: 520px) { .cats { grid-template-columns: 1fr; } }
+  .cat { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .cat .t { font-size: 12.5px; font-weight: 600; display: flex; justify-content: space-between; }
+  .cat .t em { font-style: normal; color: var(--muted); font-weight: 600; }
+  .cat .bar { height: 5px; background: #eef0f4; border-radius: 999px; margin-top: 7px; overflow: hidden; }
+  .cat .bar > i { display: block; height: 100%; border-radius: 999px; background: #4f46e5; }
+
+  .section { border-top: 1px solid var(--line); padding-top: 15px; margin-top: 15px; }
+  .section:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+  .section h3 { font-size: 13.5px; margin: 0 0 9px; display: flex; align-items: center; gap: 7px; }
+  .section h3 .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.pro { background: var(--green); }
+  .dot.con { background: var(--red); }
+  .dot.info { background: var(--accent); }
+  .dot.gap { background: var(--amber); }
+  .section ul { margin: 0; padding-left: 19px; }
+  .section li { font-size: 14px; margin-bottom: 6px; color: #2b2f36; }
+  .section p { margin: 0; font-size: 14px; color: #2b2f36; }
+  .rec { background: var(--accent-soft); border-radius: 10px; padding: 12px 14px; }
+  .rec b { color: var(--accent); }
+  .extra { background: #f8f9fc; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 10px; font-size: 13.5px; }
+  .extra div { margin-bottom: 5px; }
+  .extra div:last-child { margin-bottom: 0; }
+  .extra span { color: var(--muted); }
+
+  .quote {
+    border-left: 3px solid var(--line); background: #fafbfc; padding: 10px 14px;
+    border-radius: 0 8px 8px 0; font-size: 13px; color: #4b5563; margin-top: 16px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* history */
+  .history-head { display: flex; align-items: center; justify-content: space-between; margin: 34px 0 12px; }
+  .history-head h2 { margin: 0; font-size: 17px; }
+  .history-list { display: flex; flex-direction: column; gap: 10px; }
+  .hist {
+    display: flex; align-items: center; gap: 14px; background: var(--card);
+    border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .hist:hover { border-color: #cfd4e0; box-shadow: var(--shadow); }
+  .hist .v { font-size: 11px; font-weight: 800; padding: 4px 9px; border-radius: 999px; text-transform: uppercase; flex: 0 0 auto; }
+  .hist .v.post { background: var(--green-soft); color: var(--green); }
+  .hist .v.nopost { background: var(--red-soft); color: var(--red); }
+  .hist .score { font-weight: 800; font-size: 15px; flex: 0 0 auto; width: 48px; text-align: center; }
+  .hist .body { flex: 1 1 auto; min-width: 0; }
+  .hist .snippet { font-size: 13.5px; color: #2b2f36; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hist .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .hist .del {
+    border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 16px;
+    padding: 6px; border-radius: 8px; line-height: 1; flex: 0 0 auto;
+  }
+  .hist .del:hover { background: var(--red-soft); color: var(--red); }
+  .no-history { color: var(--muted); font-size: 13.5px; padding: 14px; text-align: center; border: 1px dashed var(--line); border-radius: 12px; }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 40px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+    background: #16181d; color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 13.5px;
+    opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; box-shadow: var(--shadow);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="brand">
+      <div class="logo">P</div>
+      <div>
+        <h1>PostEval</h1>
+        <div class="sub">Evaluate tweets &amp; LinkedIn posts before you publish them.</div>
+      </div>
+    </div>
+    <span class="pill">Pre-publish review</span>
+  </header>
+
+  <div class="grid">
+    <!-- INPUT -->
+    <div class="card">
+      <h2>Draft Post</h2>
+      <label class="field-label">Platform</label>
+      <div class="seg" id="platformSeg">
+        <button type="button" data-platform="twitter" class="active">Twitter / X</button>
+        <button type="button" data-platform="linkedin">LinkedIn</button>
+      </div>
+
+      <label class="field-label" for="input">Paste your post</label>
+      <textarea id="input" placeholder="Paste your tweet or LinkedIn post here…"></textarea>
+      <div class="meta-row">
+        <span id="wordCount">0 words</span>
+        <span id="charCount">0 / 280 characters</span>
+      </div>
+
+      <button class="btn btn-primary" id="evaluateBtn">Evaluate Post</button>
+      <button class="btn btn-ghost" id="clearBtn" style="width:100%;margin-top:9px;">Clear</button>
+    </div>
+
+    <!-- RESULT -->
+    <div class="card">
+      <h2>Evaluation</h2>
+      <div id="resultHost">
+        <div class="empty">
+          <div class="big">✦</div>
+          Paste a draft and hit <b>Evaluate Post</b>.<br>
+          You'll get a verdict, score, pros, cons and a recommendation.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="history-head">
+    <h2>Previous Evaluations</h2>
+    <button class="btn btn-ghost" id="clearHistoryBtn">Clear History</button>
+  </div>
+  <div id="historyHost" class="history-list"></div>
+
+  <footer>Local &amp; private — evaluations are stored only in this browser (localStorage).</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "postEvalHistory.v1";
+  var MAX_HISTORY = 50;
+
+  var LIMITS = { twitter: 280, linkedin: 1500 };
+  var MAX_POINTS = { align: 20, proof: 25, quality: 20, timing: 15, risk: 20 };
+
+  var input = document.getElementById("input");
+  var evaluateBtn = document.getElementById("evaluateBtn");
+  var clearBtn = document.getElementById("clearBtn");
+  var clearHistoryBtn = document.getElementById("clearHistoryBtn");
+  var resultHost = document.getElementById("resultHost");
+  var historyHost = document.getElementById("historyHost");
+  var charCount = document.getElementById("charCount");
+  var wordCount = document.getElementById("wordCount");
+  var toast = document.getElementById("toast");
+  var platform = "twitter";
+
+  /* ---------- helpers ---------- */
+
+  function toastMsg(msg) {
+    toast.textContent = msg;
+    toast.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { toast.classList.remove("show"); }, 1900);
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+  function stripMentions(text) {
+    return text.replace(/@\w+/g, "").replace(/https?:\/\/\S+/g, "").trim();
+  }
+
+  function firstLine(text) {
+    var t = text.trim();
+    var idx = t.search(/[\n.!?]/);
+    var line = idx === -1 ? t : t.slice(0, idx + 1);
+    return line.trim();
+  }
+
+  function sentences(text) {
+    return stripMentions(text).split(/(?<=[.!?])\s+/).filter(function (s) { return s.trim().length; });
+  }
+
+  function hasAny(text, arr) {
+    var low = text.toLowerCase();
+    return arr.some(function (w) { return low.indexOf(w) !== -1; });
+  }
+
+  function countMatches(text, arr) {
+    var low = text.toLowerCase();
+    return arr.reduce(function (n, w) { return n + (low.split(w).length - 1); }, 0);
+  }
+
+  function hasLink(text) { return /https?:\/\/\S+|www\.\S+/i.test(text); }
+
+  function hasMetric(text) {
+    return /\b\d[\d,.]*\s?(%|percent|x|k|K|k\+|\+)?\b/.test(text) && /\d/.test(text);
+  }
+
+  /* ---------- scoring ---------- */
+
+  function scoreStrategic(text, pros, cons) {
+    var score = 0;
+    var ctaWords = ["download", "check out", "read", "link in", "sign up", "signup", "join", "dm me",
+      "comment", "let me know", "reply", "tag someone", "share this", "book a", "schedule", "apply",
+      "here's how", "try it", "get the", "subscribe", "follow for"];
+    var audience = ["founder", "founders", "startup", "startups", "cto", "cmo", "ceo", "marketer",
+      "marketers", "builder", "builders", "agency", "clients", "team", "developer", "developers"];
+    var expertise = ["strategy", "seo", "content system", "content engine", "architect",
+      "content strategy", "content ops", "growth", "systems", "engineering", "product",
+      "design", "marketing", "analytics", "automation", "infrastructure"];
+    var intentOnly = ["i'm building", "im building", "i am building", "planning to", "thinking about",
+      "hoping to", "about to launch", "coming soon", "stay tuned", "excited to announce"];
+
+    if (hasAny(text, ctaWords)) { score += 8; pros.push("Includes a clear call-to-action to drive engagement."); }
+    else { cons.push("No explicit CTA — readers aren't told what to do next."); }
+
+    if (hasAny(text, audience)) { score += 4; pros.push("Addresses the target audience directly."); }
+    else { cons.push("Audience isn't named or signposted — hard to know who it's for."); }
+
+    if (hasAny(text, expertise)) { score += 4; pros.push("Reinforces the author's area of expertise."); }
+    else { cons.push("Misses a chance to reinforce your positioning or area of expertise."); }
+
+    if (hasAny(text, intentOnly)) {
+      cons.push("Announces intent instead of demonstrating work (\"building / coming soon\").");
+      score += 1;
+    } else {
+      score += 4;
+      pros.push("Shows work instead of announcing intent.");
+    }
+    return clamp(score, 0, MAX_POINTS.align);
+  }
+
+  function scoreProof(text, pros, cons) {
+    var score = 0;
+    var projects = ["github", "repo", "repository", "case study", "audit", "benchmark",
+      "playbook", "template", "framework", "open source", "oss", "demo", "article"];
+    var results = ["shipped", "shipped it", "grew", "grew to", "generated", "ranked", "indexed",
+      "cut", "reduced", "saved", "doubled", "3x", "4x", "5x", "10x", "achieved", "hit", "passed",
+      "launched", "built", "built a", "made", "created", "delivered", "completed"];
+
+    if (hasLink(text)) { score += 8; pros.push("Links to something concrete for readers to verify."); }
+    else { cons.push("No link or artefact — nothing to point at as proof."); }
+
+    if (hasMetric(text)) { score += 8; pros.push("Includes a concrete metric or number."); }
+    else { cons.push("No numbers — claims read as opinion without measurable evidence."); }
+
+    if (hasAny(text, projects)) { score += 5; pros.push("Names a specific project or asset as evidence."); }
+    else { cons.push("No named project, repo or case study to anchor credibility."); }
+
+    if (hasAny(text, results)) {
+      score += 4;
+      if (!hasMetric(text) && !hasLink(text)) {
+        cons.push("Mentions results but supports them with no artefact or number.");
+      } else {
+        pros.push("Grounds the claim in a result or shipped work.");
+      }
+    } else {
+      cons.push("No evidence of a result or shipped outcome.");
+    }
+    return clamp(score, 0, MAX_POINTS.proof);
+  }
+
+  function scoreQuality(text, platformName, pros, cons) {
+    var score = 0;
+    var hook = firstLine(text);
+    var hookWords = hook.split(/\s+/).filter(Boolean).length;
+    var question = /\?\s*$/.test(hook);
+    var startsWithNumber = /^\d/.test(hook);
+    var boldClaim = hasAny(hook, ["i ", "we ", "most", "why", "how", "stop", "never", "always", "the ", "this "]);
+
+    if (hookWords >= 4 && hookWords <= 18 && (question || startsWithNumber || boldClaim)) {
+      score += 6; pros.push("Strong hook — stops the scroll in the first line.");
+    } else if (hookWords < 3) {
+      cons.push("Hook is too thin to stop the scroll.");
+    } else {
+      score += 3; cons.push("Hook is passable but could be sharper or more specific.");
+    }
+
+    var sents = sentences(text);
+    if (sents.length >= 2 && sents[0].split(/\s+/).length + sents[1].split(/\s+/).length <= 45) {
+      score += 5; pros.push("Value proposition is clear within the first two sentences.");
+    } else if (sents.length >= 1) {
+      score += 2; cons.push("Value proposition takes too long to surface.");
+    }
+
+    var authentic = /\b(i|i'm|im|i've|ive|we|we're|we've|my|our)\b/i.test(text) ||
+      /\b(can't|won't|don't|doesn't|isn't|it's|that's|you're)\b/i.test(text);
+    var corporate = hasAny(text, ["leverage", "synergy", "delve", "utilize", "paradigm", "ecosystem",
+      "best-in-class", "cutting-edge", "world-class", "mission-critical", "seamless"]);
+    if (authentic && !corporate) { score += 5; pros.push("Tone reads authentic, not corporate."); }
+    else if (corporate) { cons.push("Corporate/AI-sounding phrasing weakens authenticity."); }
+    else { score += 3; cons.push("Tone is neutral — add first-person voice to feel human."); }
+
+    var limit = LIMITS[platformName];
+    var len = text.trim().length;
+    if (len === 0) { cons.push("Nothing to evaluate."); }
+    else if (len <= limit) {
+      score += 4; pros.push("Length is within the " + (platformName === "twitter" ? "280-char" : "1,500-char") + " limit.");
+    } else {
+      score += 1; cons.push("Over the " + (platformName === "twitter" ? "280-char" : "1,500-char") + " limit — tighten it.");
+    }
+    return clamp(score, 0, MAX_POINTS.quality);
+  }
+
+  function scoreTiming(text, pros, cons) {
+    var score = 0;
+    var trends = ["ai", "llm", "gpt", "agent", "agents", "seo", "google", "algorithm", "launch",
+      "open source", "funding", "seed", "series a", "hiring", "layoff", "automation", "chatgpt",
+      "gemini", "claude", "ai search", "answer engine", "aio"];
+    var now = ["today", "just", "now", "live", "launched", "just shipped", "this week", "yesterday",
+      "finally", "it's here", "we're live"];
+
+    if (hasAny(text, now)) { score += 5; pros.push("Has a reason to post now (timeliness hook)."); }
+    else { cons.push("No sense of timing — could just as easily post next month."); }
+
+    if (hasAny(text, trends)) { score += 5; pros.push("Rides a relevant trend or news cycle."); }
+    else { cons.push("Not tied to any current trend or event."); }
+
+    score += 5;
+    pros.push("Audience activity assumed for a weekday posting window (verify against your analytics).");
+    return clamp(score, 0, MAX_POINTS.timing);
+  }
+
+  function scoreRisk(text, pros, cons) {
+    var score = MAX_POINTS.risk;
+    var hype = ["revolutionary", "game-changer", "game changer", "disrupt", "disruption", "unicorn",
+      "#1", "best-in-class", "world-changing", "magical", "effortless", "10x your", "10x in"];
+    var promises = ["guarantee", "guaranteed", "promise", "promise you", "will double", "will 10x",
+      "never fail", "always work", "risk-free", "no-brainer"];
+    var secrecy = ["stealth", "secret", "can't share", "cant share", "confidential", "nda", "under wraps",
+      "haven't announced", "not public yet"];
+
+    var hypeHits = countMatches(text, hype);
+    var promiseHits = countMatches(text, promises);
+    var secrecyHits = countMatches(text, secrecy);
+
+    if (hypeHits) { score -= clamp(hypeHits * 3, 0, 8); cons.push("Hype language (" + hypeHits + "x) invites skepticism."); }
+    else { pros.push("No hype language — claims stay believable."); }
+
+    if (promiseHits) { score -= clamp(promiseHits * 4, 0, 8); cons.push("Makes promises you may not be able to keep."); }
+    else { pros.push("No overpromising."); }
+
+    if (secrecyHits) { score -= clamp(secrecyHits * 4, 0, 6); cons.push("Teases unlaunched/undisclosed work."); }
+
+    if (!hasLink(text) && hasAny(text, ["ai ", "artificial intelligence", "llm", "gpt", "agent"])) {
+      score -= 2; cons.push("Talks about AI without demonstrating AI expertise.");
+    }
+
+    return clamp(score, 0, MAX_POINTS.risk);
+  }
+
+  /* ---------- main evaluation ---------- */
+
+  function evaluate(text, platformName) {
+    var pros = [], cons = [];
+    var align = scoreStrategic(text, pros, cons);
+    var proof = scoreProof(text, pros, cons);
+    var quality = scoreQuality(text, platformName, pros, cons);
+    var timing = scoreTiming(text, pros, cons);
+    var risk = scoreRisk(text, pros, cons);
+
+    var total = align + proof + quality + timing + risk;
+    total = clamp(Math.round(total), 0, 100);
+
+    // dedupe bullets, keep order
+    pros = pros.filter(function (v, i) { return pros.indexOf(v) === i; });
+    cons = cons.filter(function (v, i) { return cons.indexOf(v) === i; });
+
+    var verdict = total >= 70 ? "POST" : "DON'T POST";
+
+    var analysis = buildAnalysis(total, verdict, align, proof, quality, risk, text);
+    var gaps = buildGaps(text, pros, cons, verdict);
+    var recommendation = buildRecommendation(total, verdict, text, platformName);
+
+    return {
+      score: total,
+      verdict: verdict,
+      categories: {
+        "Strategic Alignment": { score: align, max: MAX_POINTS.align },
+        "Proof of Work": { score: proof, max: MAX_POINTS.proof },
+        "Content Quality": { score: quality, max: MAX_POINTS.quality },
+        "Timing & Context": { score: timing, max: MAX_POINTS.timing },
+        "Risk Assessment": { score: risk, max: MAX_POINTS.risk }
+      },
+      pros: pros,
+      cons: cons,
+      analysis: analysis,
+      gaps: gaps,
+      recommendation: recommendation,
+      extra: buildExtra(verdict, platformName)
+    };
+  }
+
+  function buildAnalysis(total, verdict, align, proof, quality, risk, text) {
+    var low = text.toLowerCase();
+    var strong = [];
+    var weak = [];
+    if (align >= 14) strong.push("strategic clarity"); else if (align <= 9) weak.push("strategic focus");
+    if (proof >= 18) strong.push("proof of work"); else if (proof <= 10) weak.push("proof of work");
+    if (quality >= 15) strong.push("hook and clarity"); else if (quality <= 9) weak.push("hook and clarity");
+    if (risk >= 16) strong.push("low risk"); else if (risk <= 10) weak.push("risk control");
+
+    var s = "This post scores " + total + "/100 and earns a " + verdict + " verdict. ";
+    if (strong.length) s += "It is strongest on " + strong.join(", ") + ". ";
+    if (weak.length) s += "The weak spot is " + weak.join(", ") + ", which is what's holding it back. ";
+    if (verdict === "POST") {
+      s += "It advances your positioning and gives the audience something worth acting on. ";
+    } else {
+      s += "As written it leans on announcement over demonstration, which dilutes your positioning instead of building it. ";
+    }
+    return s.trim();
+  }
+
+  function buildGaps(text, pros, cons, verdict) {
+    var gaps = [];
+    if (!hasLink(text)) gaps.push("A link to the actual artefact (repo, audit, or case study).");
+    if (!hasMetric(text)) gaps.push("A concrete number — downloads, rankings, or time saved.");
+    if (!/\b(i|i'm|im|i've|ive|my|our|we|we've|we're)\b/i.test(text)) gaps.push("A first-person voice so it sounds like you, not a brand.");
+    if (!hasAny(text, ["download", "check out", "link in", "sign up", "join", "comment", "dm me", "reply", "let me know"])) {
+      gaps.push("A clear CTA telling readers exactly what to do next.");
+    }
+    if (text.trim().length > LIMITS[platform]) gaps.push("Trimming to fit the platform limit without losing the point.");
+    if (!gaps.length) gaps.push("Nothing major — only polish (hook sharpness, formatting).");
+    return gaps;
+  }
+
+  function buildRecommendation(total, verdict, text, platformName) {
+    if (verdict === "POST") {
+      return "Post it. It demonstrates real work with proof and a CTA — ship it and watch the replies.";
+    }
+    if (total >= 55) {
+      return "Revise before posting: keep the core idea, but add one concrete artefact or number and a sharper hook. Re-evaluate once tightened.";
+    }
+    return "Don't post as-is. Rebuild it around a shipped result or a specific, verifiable artefact instead of announcing intent.";
+  }
+
+  function buildExtra(verdict, platformName) {
+    if (verdict === "POST") {
+      var hashtags = platformName === "twitter"
+        ? ["#AI", "#SEO", "#BuildInPublic", "#ContentStrategy"]
+        : ["#AI", "#SEO", "#ContentStrategy", "#GrowthMarketing"];
+      return {
+        kind: "post",
+        bestTime: platformName === "twitter" ? "Tue–Thu, 9–11am in your audience's timezone" : "Tue–Thu, 8–10am in your audience's timezone",
+        hashtags: hashtags,
+        hook: "End with a specific question that invites founders to share their own stack."
+      };
+    }
+    return {
+      kind: "nopost",
+      instead: "Write it as a short case study of something already shipped, with a link to the artefact.",
+      when: "Post once you have a link, a number, or a screenshot to point at."
+    };
+  }
+
+  /* ---------- rendering ---------- */
+
+  function renderResult(evalObj, text, platformName) {
+    var vClass = evalObj.verdict === "POST" ? "post" : "nopost";
+    var circumference = 2 * Math.PI * 34;
+    var filled = circumference * (evalObj.score / 100);
+
+    var catHtml = Object.keys(evalObj.categories).map(function (name) {
+      var c = evalObj.categories[name];
+      var pct = Math.round((c.score / c.max) * 100);
+      return '<div class="cat"><div class="t"><span>' + escapeHtml(name) + '</span><em>' +
+        c.score + '/' + c.max + '</em></div><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+    }).join("");
+
+    var prosHtml = evalObj.pros.length
+      ? "<ul>" + evalObj.pros.map(function (p) { return "<li>" + escapeHtml(p) + "</li>"; }).join("") + "</ul>"
+      : "<p>No standout strengths detected.</p>";
+    var consHtml = evalObj.cons.length
+      ? "<ul>" + evalObj.cons.map(function (p) { return "<li>" + escapeHtml(p) + "</li>"; }).join("") + "</ul>"
+      : "<p>No major issues detected.</p>";
+    var gapsHtml = "<ul>" + evalObj.gaps.map(function (p) { return "<li>" + escapeHtml(p) + "</li>"; }).join("") + "</ul>";
+
+    var extraHtml = "";
+    if (evalObj.extra.kind === "post") {
+      extraHtml = '<div class="extra">' +
+        '<div><span>Best time to post:</span> ' + escapeHtml(evalObj.extra.bestTime) + '</div>' +
+        '<div><span>Hashtags:</span> ' + evalObj.extra.hashtags.map(escapeHtml).join(" ") + '</div>' +
+        '<div><span>Engagement hook:</span> ' + escapeHtml(evalObj.extra.hook) + '</div>' +
+        '</div>';
+    } else {
+      extraHtml = '<div class="extra">' +
+        '<div><span>What to do instead:</span> ' + escapeHtml(evalObj.extra.instead) + '</div>' +
+        '<div><span>When to post:</span> ' + escapeHtml(evalObj.extra.when) + '</div>' +
+        '</div>';
+    }
+
+    resultHost.innerHTML =
+      '<div class="result-head">' +
+        '<div class="gauge-wrap">' +
+          '<div class="gauge">' +
+            '<svg width="86" height="86" viewBox="0 0 86 86">' +
+              '<circle cx="43" cy="43" r="34" fill="none" stroke="#eef0f4" stroke-width="9"></circle>' +
+              '<circle cx="43" cy="43" r="34" fill="none" stroke="url(#g)" stroke-width="9" stroke-linecap="round" ' +
+                'stroke-dasharray="' + filled.toFixed(1) + ' ' + circumference.toFixed(1) + '"></circle>' +
+              '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">' +
+                '<stop offset="0%" stop-color="#4f46e5"></stop><stop offset="100%" stop-color="#7c3aed"></stop>' +
+              '</linearGradient></defs>' +
+            '</svg>' +
+            '<div class="val"><div><b>' + evalObj.score + '</b><br><span>/100</span></div></div>' +
+          '</div>' +
+          '<div>' +
+            '<span class="verdict ' + vClass + '">' + escapeHtml(evalObj.verdict) + '</span>' +
+            '<div class="platform-tag" style="margin-top:8px;">' + escapeHtml(platformName === "twitter" ? "Twitter / X" : "LinkedIn") + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="scorebar"><i style="width:' + evalObj.score + '%"></i></div>' +
+      '<div class="cats">' + catHtml + '</div>' +
+      '<div class="section"><h3><span class="dot pro"></span>Pros</h3>' + prosHtml + '</div>' +
+      '<div class="section"><h3><span class="dot con"></span>Cons</h3>' + consHtml + '</div>' +
+      '<div class="section"><h3><span class="dot info"></span>Strategic Analysis</h3><p>' + escapeHtml(evalObj.analysis) + '</p></div>' +
+      '<div class="section"><h3><span class="dot gap"></span>Gaps</h3>' + gapsHtml + '</div>' +
+      '<div class="section"><h3><span class="dot info"></span>Recommendation</h3><div class="rec"><b>' +
+        escapeHtml(evalObj.verdict === "POST" ? "Recommended action" : "Advice") + ':</b> ' + escapeHtml(evalObj.recommendation) +
+        '</div>' + extraHtml + '</div>' +
+      '<div class="quote">' + escapeHtml(text.trim()) + '</div>';
+  }
+
+  function renderEmpty() {
+    resultHost.innerHTML =
+      '<div class="empty"><div class="big">✦</div>Paste a draft and hit <b>Evaluate Post</b>.<br>' +
+      'You\'ll get a verdict, score, pros, cons and a recommendation.</div>';
+  }
+
+  /* ---------- history ---------- */
+
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch (e) { return []; }
+  }
+
+  function saveHistory(list) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  function renderHistory() {
+    var list = loadHistory();
+    if (!list.length) {
+      historyHost.innerHTML = '<div class="no-history">No evaluations yet — your history will appear here.</div>';
+      return;
+    }
+    historyHost.innerHTML = list.map(function (item) {
+      var vClass = item.verdict === "POST" ? "post" : "nopost";
+      var date = new Date(item.timestamp);
+      var stamp = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      return '<div class="hist" data-id="' + item.id + '">' +
+        '<span class="v ' + vClass + '">' + escapeHtml(item.verdict) + '</span>' +
+        '<span class="score">' + item.score + '</span>' +
+        '<div class="body">' +
+          '<div class="snippet">' + escapeHtml(item.snippet) + '</div>' +
+          '<div class="meta">' + escapeHtml(item.platform === "twitter" ? "Twitter / X" : "LinkedIn") + ' · ' + stamp + '</div>' +
+        '</div>' +
+        '<button class="del" data-del="' + item.id + '" title="Delete">✕</button>' +
+      '</div>';
+    }).join("");
+
+    Array.prototype.forEach.call(historyHost.querySelectorAll(".hist"), function (el) {
+      el.addEventListener("click", function (e) {
+        if (e.target.hasAttribute("data-del")) { deleteItem(el.getAttribute("data-id")); return; }
+        loadItem(el.getAttribute("data-id"));
+      });
+    });
+  }
+
+  function addHistory(entry) {
+    var list = loadHistory();
+    list.unshift(entry);
+    if (list.length > MAX_HISTORY) list = list.slice(0, MAX_HISTORY);
+    saveHistory(list);
+  }
+
+  function deleteItem(id) {
+    saveHistory(loadHistory().filter(function (i) { return i.id !== id; }));
+    renderHistory();
+    toastMsg("Evaluation deleted.");
+  }
+
+  function loadItem(id) {
+    var item = loadHistory().filter(function (i) { return i.id === id; })[0];
+    if (!item) return;
+    input.value = item.text;
+    setPlatform(item.platform);
+    updateCounts();
+    renderResult(item.result, item.text, item.platform);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toastMsg("Loaded past evaluation.");
+  }
+
+  /* ---------- platform + counts ---------- */
+
+  function setPlatform(p) {
+    platform = p;
+    Array.prototype.forEach.call(document.querySelectorAll("#platformSeg button"), function (b) {
+      b.classList.toggle("active", b.getAttribute("data-platform") === p);
+    });
+    updateCounts();
+  }
+
+  function updateCounts() {
+    var len = input.value.trim().length;
+    var words = input.value.trim() ? input.value.trim().split(/\s+/).length : 0;
+    wordCount.textContent = words + " word" + (words === 1 ? "" : "s");
+    var limit = LIMITS[platform];
+    charCount.textContent = len + " / " + limit + " characters";
+    charCount.className = len > limit ? "char-over" : (len > limit * 0.9 ? "char-warn" : "");
+  }
+
+  /* ---------- events ---------- */
+
+  document.getElementById("platformSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (b) setPlatform(b.getAttribute("data-platform"));
+  });
+
+  input.addEventListener("input", updateCounts);
+
+  clearBtn.addEventListener("click", function () {
+    input.value = "";
+    updateCounts();
+    renderEmpty();
+  });
+
+  clearHistoryBtn.addEventListener("click", function () {
+    saveHistory([]);
+    renderHistory();
+    toastMsg("History cleared.");
+  });
+
+  evaluateBtn.addEventListener("click", function () {
+    var text = input.value.trim();
+    if (!text) { toastMsg("Paste a post first."); input.focus(); return; }
+
+    var evalObj = evaluate(text, platform);
+    renderResult(evalObj, text, platform);
+
+    var snippet = text.replace(/\s+/g, " ");
+    if (snippet.length > 140) snippet = snippet.slice(0, 140).trim() + "…";
+
+    addHistory({
+      id: "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      timestamp: Date.now(),
+      platform: platform,
+      text: text,
+      snippet: snippet,
+      verdict: evalObj.verdict,
+      score: evalObj.score,
+      result: evalObj
+    });
+
+    renderHistory();
+    toastMsg(evalObj.verdict === "POST" ? "Verdict: POST · " + evalObj.score + "/100" : "Verdict: DON'T POST · " + evalObj.score + "/100");
+  });
+
+  /* ---------- init ---------- */
+  setPlatform("twitter");
+  renderHistory();
+})();
+</script>
+</body>
+</html>

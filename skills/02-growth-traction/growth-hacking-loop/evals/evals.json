@@ -1,0 +1,40 @@
+{
+  "skill_name": "growth-hacking-loop",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Our signups are strong but few users finish onboarding. Where do we start?",
+      "expected_output": "Maps the AARRR funnel, identifies activation as the bottleneck, and proposes a prioritized batch of experiments with ICE scoring and a defined success metric.",
+      "assertions": [
+        "Maps the AARRR funnel",
+        "Identifies activation as the weakest stage",
+        "Proposes prioritizing ideas with ICE or a similar framework",
+        "Defines a success metric and minimum detectable effect",
+        "Warns against running too many experiments at once"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "We ran 3 experiments this month and 2 won. Is that a good win rate?",
+      "expected_output": "Checks the win rate against a healthy range (10-30%) and asks for experiment count and statistical confidence before celebrating.",
+      "assertions": [
+        "States a healthy win-rate range",
+        "Asks for the number of experiments and statistical confidence",
+        "Warns against declaring victory on a small sample"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Should we chase acquisition or fix retention first?",
+      "expected_output": "Prioritizes retention. Growth without retention leaks, and the skill flags the leaky-bucket anti-pattern.",
+      "assertions": [
+        "Prioritizes retention over acquisition",
+        "Flags growth without retention as a leak",
+        "Recommends fixing retention before scaling acquisition"
+      ],
+      "files": []
+    }
+  ]
+}

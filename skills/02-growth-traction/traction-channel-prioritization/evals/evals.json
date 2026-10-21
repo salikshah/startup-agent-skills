@@ -1,0 +1,41 @@
+{
+  "skill_name": "traction-channel-prioritization",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We have a B2B analytics product and a small budget. Which traction channel should we test first?",
+      "expected_output": "Runs the bullseye framework: brainstorm the 19 channels, estimate reach, cost, and conversion, place them in rings, and pick one inner-ring channel to test with at least 100 data points.",
+      "assertions": [
+        "References the 19 traction channels",
+        "Places channels in three bullseye rings",
+        "Selects one inner-ring channel to focus on",
+        "Requires at least 100 data points to evaluate",
+        "Evaluates channels on CAC, scalability, and sustainability"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Can we test content, SEO, and paid ads all at once?",
+      "expected_output": "Advises against testing three channels simultaneously. Focus is needed to get clean signal.",
+      "assertions": [
+        "Advises against testing multiple channels at once",
+        "Explains that focus is needed for clean signal",
+        "Recommends testing one channel first"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Our content channel has a CAC of $45 and compounds. Should we pull the bullseye?",
+      "expected_output": "Confirms the channel passes CAC, scalability, and sustainability, then recommends pulling the bullseye and scaling it until saturation.",
+      "assertions": [
+        "Checks CAC against the criteria",
+        "Checks scalability and sustainability",
+        "Recommends pulling the bullseye on a passing channel",
+        "Warns against diversifying before saturation"
+      ],
+      "files": []
+    }
+  ]
+}

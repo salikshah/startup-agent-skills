@@ -1,0 +1,39 @@
+{
+  "skill_name": "doing-content-right-sop",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm a solo consultant. How do I start a content engine?",
+      "expected_output": "Defines 3 to 5 content pillars, picks one primary distribution channel, batches production, and repurposes one cornerstone piece into many assets.",
+      "assertions": [
+        "Defines 3 to 5 content pillars",
+        "Chooses one primary distribution channel first",
+        "Uses batch production and a sustainable cadence",
+        "Repurposes one long-form piece into many assets"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Should I post on five platforms at once?",
+      "expected_output": "Advises mastering one channel first instead of spreading thin.",
+      "assertions": [
+        "Advises against posting on five platforms at once",
+        "Recommends mastering one channel first",
+        "Explains the tradeoff of spreading thin"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I published in bursts then went silent. What should I change?",
+      "expected_output": "Sets a sustainable cadence for 12+ months rather than heroic bursts, and captures the audience into owned channels.",
+      "assertions": [
+        "Recommends a sustainable cadence over bursts",
+        "Mentions a 12-month horizon",
+        "Recommends capturing the audience into an owned channel"
+      ],
+      "files": []
+    }
+  ]
+}
