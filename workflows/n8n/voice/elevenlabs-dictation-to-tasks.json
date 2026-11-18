@@ -1,0 +1,504 @@
+{
+  "name": "ElevenLabs: Telegram voice note to tasks",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Dictation -> tasks (original)\nSend a voice note to your Telegram bot. ElevenLabs Scribe transcribes it, an LLM pulls out tasks (title, due date, priority), they are appended to a Google Sheet and the bot replies with what it captured.\nOnly the chat id in **Config** is served.",
+        "height": 240,
+        "width": 480
+      },
+      "id": "99342909-ead0-5104-af02-f62f28609760",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "b8620263-f729-592d-aaa2-1f52fa9da1b0",
+      "name": "Telegram trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "185735b7-222f-5deb-ae2c-a7fc9d36b292",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b75c51fa-5221-56d7-8f25-1bfaa23d3aee",
+              "name": "allowed_chat_id",
+              "value": "REPLACE_WITH_YOUR_TELEGRAM_CHAT_ID",
+              "type": "string"
+            },
+            {
+              "id": "4cbeadf0-673d-56fd-955e-4e07eeacdedc",
+              "name": "sheet_url",
+              "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit",
+              "type": "string"
+            },
+            {
+              "id": "b00af813-106a-5637-8fb3-db617b5cc196",
+              "name": "timezone",
+              "value": "Europe/London",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "de684721-99be-5247-8d9b-9d8ee3c75107",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "446db134-e851-522f-ba94-a8b0b3e329b7",
+              "leftValue": "={{ String($json.message.chat.id) }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "={{ $json.allowed_chat_id }}"
+            },
+            {
+              "id": "1fd6b524-25f7-5a55-ba8c-cbb6e54fc933",
+              "leftValue": "={{ $json.message.voice?.file_id || $json.message.audio?.file_id || '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1c97847b-6e68-58ff-a3f1-7bf974d045ba",
+      "name": "Voice note from me?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.message.voice?.file_id || $json.message.audio?.file_id }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "id": "53df9b29-e4b5-5396-ae26-664253bdc86b",
+      "name": "Download audio",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/speech-to-text",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model_id",
+              "value": "scribe_v1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "1dcdacb5-bbb6-5188-825c-8cd7b1f8cc02",
+      "name": "ElevenLabs speech to text",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Header Auth (set in n8n)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Transcript:\n{{ $json.text }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You turn a founder's spoken notes into concrete tasks. Today is {{ $now.setZone($('Config').first().json.timezone).toISODate() }}. Resolve relative dates (\"tomorrow\", \"Friday\") to YYYY-MM-DD, else use an empty string. Priority 1 (urgent) to 4 (someday). Ignore filler. Do not invent tasks."
+            }
+          ]
+        }
+      },
+      "id": "a2baa982-bb8e-5c58-bf7f-bae4a875bced",
+      "name": "Extract tasks",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "a0c9aff8-4da2-5cc3-a15c-3b66d937bccc",
+      "name": "Extract tasks - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1128,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"tasks\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"title\": {\n            \"type\": \"string\"\n          },\n          \"due_date\": {\n            \"type\": \"string\"\n          },\n          \"priority\": {\n            \"type\": \"number\"\n          },\n          \"context\": {\n            \"type\": \"string\"\n          }\n        },\n        \"required\": [\n          \"title\",\n          \"due_date\",\n          \"priority\",\n          \"context\"\n        ],\n        \"additionalProperties\": false\n      }\n    },\n    \"summary\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"tasks\",\n    \"summary\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "0a435158-dba7-56eb-9ce9-a827f875625e",
+      "name": "Extract tasks - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = $input.first().json.output || {};\nconst chat = $('Telegram trigger').first().json.message.chat.id;\nreturn (out.tasks || []).map(t => ({ json: { ...t, source: 'voice', chat_id: chat, created_at: new Date().toISOString(), transcript: $('ElevenLabs speech to text').first().json.text } }));"
+      },
+      "id": "0a34e499-4a25-503a-97ea-61088b58d6cd",
+      "name": "One row per task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "tasks"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "created_at": "={{ $json.created_at }}",
+            "title": "={{ $json.title }}",
+            "due_date": "={{ $json.due_date }}",
+            "priority": "={{ $json.priority }}",
+            "context": "={{ $json.context }}",
+            "status": "todo"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "due_date",
+              "displayName": "due_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "priority",
+              "displayName": "priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "context",
+              "displayName": "context",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "5c52a6de-c770-5338-8fd6-1eb76ef4804a",
+      "name": "Append tasks",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1680,
+        -200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram trigger').first().json.message.chat.id }}",
+        "text": "={{ 'Captured ' + ($json.output.tasks || []).length + ' task(s):\\n' + ($json.output.tasks || []).map(t => '- ' + t.title + (t.due_date ? ' (due ' + t.due_date + ')' : '')).join('\\n') }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "1a4e2c9f-ea4b-56d8-bffd-26c18485a7d4",
+      "name": "Reply in Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Extract tasks - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract tasks",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract tasks - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Extract tasks",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram trigger": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Voice note from me?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Voice note from me?": {
+      "main": [
+        [
+          {
+            "node": "Download audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download audio": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs speech to text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs speech to text": {
+      "main": [
+        [
+          {
+            "node": "Extract tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract tasks": {
+      "main": [
+        [
+          {
+            "node": "One row per task",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reply in Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One row per task": {
+      "main": [
+        [
+          {
+            "node": "Append tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "voice"
+    }
+  ]
+}

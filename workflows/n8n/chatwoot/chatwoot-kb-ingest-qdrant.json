@@ -1,0 +1,376 @@
+{
+  "name": "Chatwoot Help Center to Qdrant knowledge base",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## KB ingest (original)\nPulls published Chatwoot Help Center articles and (re)builds the `support_kb` Qdrant collection used by `chatwoot-rag-agent-qdrant` and `support-faq-rag-chat`.\nRuns on demand or every Monday 06:00. The first node clears the collection so edits and deletions are reflected.",
+        "height": 240,
+        "width": 480
+      },
+      "id": "d2693ce0-7ced-54dd-b6b8-e30cc17a8b99",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "ac7d6c38-0f74-5364-bdad-5b15d6a36228",
+      "name": "Run now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "accd1e96-4124-5e2e-89d3-d41328ad7550",
+      "name": "Every Monday 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8798da47-b10a-5f6f-b3da-546ea91f8ace",
+              "name": "chatwoot_url",
+              "value": "http://chatwoot:3000",
+              "type": "string"
+            },
+            {
+              "id": "42f12773-be58-5d6a-8020-215f1a2f4e12",
+              "name": "account_id",
+              "value": "1",
+              "type": "string"
+            },
+            {
+              "id": "5816123e-b12c-51de-b568-92858e498dcf",
+              "name": "portal_slug",
+              "value": "help",
+              "type": "string"
+            },
+            {
+              "id": "948aa7bf-584a-58fb-bdbd-09fb656b3007",
+              "name": "qdrant_url",
+              "value": "http://qdrant:6333",
+              "type": "string"
+            },
+            {
+              "id": "8f5dcb8f-9c94-501a-93f2-67e257808b9a",
+              "name": "collection",
+              "value": "support_kb",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "3768156e-dcca-5827-9146-2f99dfde7bfc",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.qdrant_url }}/collections/{{ $json.collection }}/points/delete",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{ \"filter\": {} }",
+        "options": {}
+      },
+      "id": "eef14162-8694-5959-9ba9-645dee8f14e3",
+      "name": "Clear collection",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.chatwoot_url }}/api/v1/accounts/{{ $('Config').first().json.account_id }}/portals/{{ $('Config').first().json.portal_slug }}/articles",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "published"
+            },
+            {
+              "name": "per_page",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d6366579-60b7-51f3-8e73-80e849887b9e",
+      "name": "List help center articles",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Header Auth (set in n8n)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Chatwoot Help Center articles -> one document per published article.\nconst cfg = $('Config').first().json;\nconst res = $input.first().json;\nconst list = res.payload || res.data || res.articles || [];\nconst strip = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst out = list\n  .filter(a => !a.status || a.status === 'published' || a.status === 1)\n  .map(a => ({ json: {\n    title: a.title,\n    url: cfg.chatwoot_url + '/hc/' + cfg.portal_slug + '/articles/' + (a.slug || a.id),\n    content: '# ' + a.title + '\\n\\n' + strip(a.content || a.description)\n  } }));\nif (!out.length) throw new Error('No published articles found. Check portal_slug and the API token.');\nreturn out;"
+      },
+      "id": "3f37eaa0-89b9-58b3-8548-092961f1ecd0",
+      "name": "Articles to documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config').first().json.collection }}"
+        },
+        "options": {}
+      },
+      "id": "1dc67796-cccd-51ef-b045-4cdc0b052203",
+      "name": "Insert into Qdrant",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        1200,
+        0
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Qdrant (local: http://qdrant:6333)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "153e2766-5e9c-59fc-91a7-ca1a8a040059",
+      "name": "Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1104,
+        240
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.content }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "title",
+                "value": "={{ $json.title }}"
+              },
+              {
+                "name": "url",
+                "value": "={{ $json.url }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "d961d17b-000f-5abb-8631-3426d6f411a6",
+      "name": "Document loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "chunkSize": 1000,
+        "chunkOverlap": 150,
+        "options": {}
+      },
+      "id": "4ea6d910-9fac-50de-8d53-2d8a4923857a",
+      "name": "Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1296,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insert into Qdrant",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert into Qdrant",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Document loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run now": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every Monday 06:00": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Clear collection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clear collection": {
+      "main": [
+        [
+          {
+            "node": "List help center articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List help center articles": {
+      "main": [
+        [
+          {
+            "node": "Articles to documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Articles to documents": {
+      "main": [
+        [
+          {
+            "node": "Insert into Qdrant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "chatwoot"
+    }
+  ]
+}

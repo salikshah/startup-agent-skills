@@ -1,0 +1,569 @@
+{
+  "name": "ElevenLabs voice agent: n8n server tools (FAQ lookup + lead capture)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Voice agent tools (original)\nOne webhook serves ElevenLabs Agent *server tools*. Route with `?tool=lookup_faq` or `?tool=capture_lead` in the tool URL.\nEvery request must carry header `x-tool-secret` equal to `shared_secret` in **Config**.\nResponses are short JSON the agent reads aloud.",
+        "height": 240,
+        "width": 480
+      },
+      "id": "8e51afcf-b5f6-5bc8-8d16-d6750959c449",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "elevenlabs-tools",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "dc044def-90ee-5c97-8b3a-61501c542303",
+      "name": "Tool webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "3224b39b-a53b-5a8b-a990-1c776ca63292"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2378b179-c945-58a3-97fa-48343ffe5396",
+              "name": "shared_secret",
+              "value": "REPLACE_WITH_A_LONG_RANDOM_STRING",
+              "type": "string"
+            },
+            {
+              "id": "7229779b-896a-5de9-816e-2ad0b9620067",
+              "name": "kb_url",
+              "value": "https://raw.githubusercontent.com/your-org/your-repo/main/support/faq.md",
+              "type": "string"
+            },
+            {
+              "id": "4cbeadf0-673d-56fd-955e-4e07eeacdedc",
+              "name": "sheet_url",
+              "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit",
+              "type": "string"
+            },
+            {
+              "id": "5a622b42-21ab-5985-a184-0ea3dab7347c",
+              "name": "company_name",
+              "value": "Acme",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "56a69754-d2fb-5c5f-9e12-a2119c49bf7c",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Shared-secret check + tool routing for ElevenLabs Agent server tools.\nconst cfg = $('Config').first().json;\nconst req = $input.first().json;\nconst h = req.headers || {};\nconst secret = h['x-tool-secret'] || '';\nconst ok = cfg.shared_secret && !String(cfg.shared_secret).startsWith('REPLACE') && secret === cfg.shared_secret;\nconst body = req.body || {};\nconst tool = ok ? String(body.tool || (req.query || {}).tool || '') : 'unauthorized';\nreturn [{ json: { tool, args: body, conversation_id: body.conversation_id || '' } }];"
+      },
+      "id": "ef07452a-1ced-5712-a8ed-cd11e765b6f1",
+      "name": "Check secret and route",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "eb91ed67-a1c5-5dbe-96b8-714dce0eab4c",
+                    "leftValue": "={{ $json.tool }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "lookup_faq"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "lookup_faq"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "26137b81-bc6d-575b-a047-e7489a43f4d8",
+                    "leftValue": "={{ $json.tool }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "capture_lead"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "capture_lead"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "107ced54-8746-5f44-b8c0-d11cde83a45d",
+                    "leftValue": "={{ $json.tool }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "unauthorized"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "unauthorized"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "4151fc6d-c22b-5b50-96d8-9d1f7fa6867e",
+      "name": "Which tool?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.kb_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "c76f0ac8-ed45-5dba-917f-05249c216b0d",
+      "name": "Get knowledge base",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Caller question: {{ $('Check secret and route').first().json.args.question }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You answer phone questions for {{ $('Config').first().json.company_name }} using ONLY the knowledge base. Reply in at most two short spoken sentences, no lists, no URLs. If the answer is not in the knowledge base, set found=false and say you will have a person follow up.\n\nKNOWLEDGE BASE\n---\n{{ $json.data.slice(0, 12000) }}\n---"
+            }
+          ]
+        }
+      },
+      "id": "cb75043d-a1ff-50bd-a523-85b5490019ea",
+      "name": "Answer for voice",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1200,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "04303787-2c37-5b7d-86b1-5a8ed2c43acc",
+      "name": "Answer for voice - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1128,
+        0
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"answer\": {\n      \"type\": \"string\"\n    },\n    \"found\": {\n      \"type\": \"boolean\"\n    }\n  },\n  \"required\": [\n    \"answer\",\n    \"found\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "f5b20e90-cb98-507f-af17-e610fc669344",
+      "name": "Answer for voice - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.output) }}",
+        "options": {}
+      },
+      "id": "fff8e15d-fd74-58e3-9e79-7ba04aec53cd",
+      "name": "Reply: answer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "voice_leads"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "created_at": "={{ $now.toISO() }}",
+            "name": "={{ $json.args.name }}",
+            "email": "={{ $json.args.email }}",
+            "phone": "={{ $json.args.phone }}",
+            "interest": "={{ $json.args.interest }}",
+            "conversation_id": "={{ $json.conversation_id }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "interest",
+              "displayName": "interest",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "43911705-21eb-5eb9-99b9-4a1ec2012986",
+      "name": "Save lead",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        120
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, message: \"Saved. Tell the caller someone will reach out within one business day.\" }) }}",
+        "options": {}
+      },
+      "id": "6c72473b-e077-5391-a83d-a744cf1a5747",
+      "name": "Reply: saved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: \"unauthorized\" }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "62d99c58-eda8-5cd3-aa6f-109c32974fed",
+      "name": "Reply: 401",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: \"unknown tool; use ?tool=lookup_faq or ?tool=capture_lead\" }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "db8f68b7-ff10-55fc-830f-53fcb03efd78",
+      "name": "Reply: unknown tool",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        480
+      ]
+    }
+  ],
+  "connections": {
+    "Answer for voice - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer for voice",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer for voice - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Answer for voice",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Check secret and route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check secret and route": {
+      "main": [
+        [
+          {
+            "node": "Which tool?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Which tool?": {
+      "main": [
+        [
+          {
+            "node": "Get knowledge base",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply: 401",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply: unknown tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get knowledge base": {
+      "main": [
+        [
+          {
+            "node": "Answer for voice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer for voice": {
+      "main": [
+        [
+          {
+            "node": "Reply: answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save lead": {
+      "main": [
+        [
+          {
+            "node": "Reply: saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "voice"
+    }
+  ]
+}

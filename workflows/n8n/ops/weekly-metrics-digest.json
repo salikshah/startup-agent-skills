@@ -1,0 +1,331 @@
+{
+  "name": "Weekly metrics digest: sheet -> week-over-week deltas -> LLM narrative -> Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Weekly metrics digest (original)\nKeep one row per week in a `metrics` tab (`week`, then numeric columns such as mrr, signups, activated, churned, nps, plus optional `notes`). Every Monday 08:00 it computes week-over-week change in code (the LLM never does arithmetic), asks for wins/concerns/one focus, and posts to Slack.",
+        "height": 240,
+        "width": 500
+      },
+      "id": "f6ebf71b-234c-580a-bd43-637bf5d4b19e",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "61c7c0d2-a204-510f-91e2-f6964c28a551",
+      "name": "Mondays 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4cbeadf0-673d-56fd-955e-4e07eeacdedc",
+              "name": "sheet_url",
+              "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit",
+              "type": "string"
+            },
+            {
+              "id": "c69cf90e-a2c3-54ea-af3f-9cc4bf5fb545",
+              "name": "slack_channel_id",
+              "value": "C0123456789",
+              "type": "string"
+            },
+            {
+              "id": "50ccd3d0-d0b4-52be-9144-cfb28f8b662f",
+              "name": "north_star",
+              "value": "weekly active teams",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a51a5c22-460b-59f1-8c11-a408ccde26d3",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "metrics"
+        },
+        "options": {}
+      },
+      "id": "30120271-833e-5daa-a731-c69a511bb96f",
+      "name": "Read metrics",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compare the last two rows of the metrics tab (one row per week, numeric columns).\nconst rows = $input.all().map(i => i.json).filter(r => r.week);\nif (rows.length < 2) throw new Error('Need at least two weekly rows in the metrics tab.');\nconst cur = rows[rows.length - 1], prev = rows[rows.length - 2];\nconst lines = [];\nfor (const k of Object.keys(cur)) {\n  if (k === 'week' || k === 'row_number' || k === 'notes') continue;\n  const a = Number(cur[k]), b = Number(prev[k]);\n  if (Number.isNaN(a) || Number.isNaN(b)) continue;\n  const pct = b === 0 ? null : ((a - b) / Math.abs(b)) * 100;\n  lines.push({ metric: k, current: a, previous: b, change_pct: pct === null ? null : Math.round(pct * 10) / 10 });\n}\nreturn [{ json: { week: cur.week, previous_week: prev.week, notes: cur.notes || '', metrics: lines,\n  table: lines.map(l => l.metric + ': ' + l.current + ' (prev ' + l.previous + (l.change_pct === null ? '' : ', ' + (l.change_pct >= 0 ? '+' : '') + l.change_pct + '%') + ')').join('\\n') } }];"
+      },
+      "id": "58f561ef-15ed-538c-8d67-c9e27496bb83",
+      "name": "Compute week over week",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Week {{ $json.week }} vs {{ $json.previous_week }}\n{{ $json.table }}\nNotes: {{ $json.notes || 'none' }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are a blunt startup operator writing the Monday metrics note. North-star metric: {{ $('Config').first().json.north_star }}.\nUse only the numbers given; do not recompute them. Call out any metric that moved more than 15% either way. focus = the single most important thing to work on this week and why. questions = what the team should find out."
+            }
+          ]
+        }
+      },
+      "id": "25251274-47c4-5192-93b2-d5453b24b770",
+      "name": "Write narrative",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "fdc89d5d-039a-5f7d-af4b-53bf5c6954b3",
+      "name": "Write narrative - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        888,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"headline\": {\n      \"type\": \"string\"\n    },\n    \"wins\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"concerns\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"focus\": {\n      \"type\": \"string\"\n    },\n    \"questions\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    }\n  },\n  \"required\": [\n    \"headline\",\n    \"wins\",\n    \"concerns\",\n    \"focus\",\n    \"questions\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "c4b024f6-f092-503b-9e0e-d2d309554708",
+      "name": "Write narrative - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1080,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const m = $('Compute week over week').first().json;\nconst o = $input.first().json.output;\nconst bullets = a => (a || []).map(x => '- ' + x).join('\\n');\nconst text = '*Weekly metrics ' + m.week + '*: ' + o.headline + '\\n\\n' + '```' + m.table + '```' +\n  '\\n\\n*Wins*\\n' + bullets(o.wins) + '\\n\\n*Concerns*\\n' + bullets(o.concerns) + '\\n\\n*Focus this week:* ' + o.focus + '\\n\\n*Questions to answer*\\n' + bullets(o.questions);\nreturn [{ json: { text } }];"
+      },
+      "id": "9a73031b-4ccb-574a-91e5-9d1b631743c4",
+      "name": "Format message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config').first().json.slack_channel_id }}"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {}
+      },
+      "id": "233d3094-6390-59fe-b088-ad14c4639fb4",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1440,
+        0
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Write narrative - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write narrative",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write narrative - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Write narrative",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mondays 08:00": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read metrics": {
+      "main": [
+        [
+          {
+            "node": "Compute week over week",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute week over week": {
+      "main": [
+        [
+          {
+            "node": "Write narrative",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write narrative": {
+      "main": [
+        [
+          {
+            "node": "Format message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format message": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "ops"
+    }
+  ]
+}

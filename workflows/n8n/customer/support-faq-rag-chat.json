@@ -1,0 +1,214 @@
+{
+  "name": "Support FAQ chat widget (n8n Chat + Qdrant RAG)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## FAQ chat (original)\nPublic n8n chat (embed with `@n8n/chat`) answering from the `support_kb` Qdrant collection built by `chatwoot-kb-ingest-qdrant` (or any loader).\nIf the KB has no answer it says so and points to your support email instead of guessing.",
+        "height": 220,
+        "width": 460
+      },
+      "id": "ce2850f3-e611-554a-bd0d-ee54f4dbaf0a",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "public": true,
+        "options": {
+          "title": "Ask us anything",
+          "initialMessages": "Hi! Ask a question about the product."
+        }
+      },
+      "id": "9e92004d-4c28-503b-be54-b7aaf1dcc8c9",
+      "name": "Chat",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "cdd98031-55b3-50a8-a7c3-d6627da02439"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You answer customer questions using only the knowledge_base tool. If it has no answer, say you are not sure and suggest emailing support@example.com. Never invent prices, dates or features. Keep answers under 100 words.",
+          "maxIterations": 4
+        }
+      },
+      "id": "0211589b-1e00-588f-9dde-6d67653b8905",
+      "name": "FAQ agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "id": "4e44af5b-27a9-53ba-8077-77e848e729e9",
+      "name": "Chat model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        96,
+        240
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "contextWindowLength": 6
+      },
+      "id": "791eaffe-f089-50c8-95d4-5129bd33a54c",
+      "name": "Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "knowledge_base",
+        "toolDescription": "Search the help center and FAQ for product, pricing, setup and policy answers.",
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "id",
+          "value": "support_kb"
+        },
+        "topK": 5,
+        "options": {}
+      },
+      "id": "f1a91260-e7a9-5ec7-b23e-b5615e8360d9",
+      "name": "knowledge_base",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        384,
+        240
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Qdrant (local: http://qdrant:6333)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "f2ad939f-5479-53dc-9194-dcdce48deb50",
+      "name": "Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        384,
+        480
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chat": {
+      "main": [
+        [
+          {
+            "node": "FAQ agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "FAQ agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "FAQ agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "knowledge_base": {
+      "ai_tool": [
+        [
+          {
+            "node": "FAQ agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "knowledge_base",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "customer"
+    }
+  ]
+}

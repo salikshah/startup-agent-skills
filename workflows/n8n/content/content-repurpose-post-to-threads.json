@@ -1,0 +1,485 @@
+{
+  "name": "Repurpose one post or article into an X thread + LinkedIn post (drafts)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## One source -> X thread + LinkedIn (original)\nPOST `{ \"text\": \"...\" }` or `{ \"url\": \"https://...\" }`. Returns drafts and logs them to a `content_queue` sheet with status `draft`.\nNothing is published. Run each draft through `post-eval-gate` next.",
+        "height": 220,
+        "width": 480
+      },
+      "id": "e56146c2-c413-508d-b610-b0f881e53b9f",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "repurpose",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "067e6ef8-04e3-5e4d-a639-b658c6906fca",
+      "name": "Source webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "8ea65dc6-953f-5d22-91aa-987296021722"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4cbeadf0-673d-56fd-955e-4e07eeacdedc",
+              "name": "sheet_url",
+              "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit",
+              "type": "string"
+            },
+            {
+              "id": "533ae844-7d26-5a22-9766-ac05b6d3b0ad",
+              "name": "voice",
+              "value": "Plain, specific, first person. Numbers over adjectives. No hype words, no emoji walls, no hashtags in the body.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "cd99e75c-0e92-5f8c-9e50-8ca87e4ef681",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || {};\nconst url = String(b.url || '').trim();\nconst text = String(b.text || '').trim();\nif (!url && !text) throw new Error('Send \"text\" (the source post/article) or \"url\".');\nreturn [{ json: { url, source_text: text, angle: b.angle || '' } }];"
+      },
+      "id": "b195f9b7-e960-5b68-acbd-080722c78012",
+      "name": "Normalize input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "229c9921-60d2-52e2-9341-0051c120dde2",
+              "leftValue": "={{ $json.url }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "59f662b0-ad2d-5d44-99b4-ce48b17d455b",
+      "name": "Is it a URL?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "d49317e2-c219-5921-bbb3-88a7ca7610d7",
+      "name": "Fetch page",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = String($input.first().json.data || '');\nconst text = html.replace(/<script[\\s\\S]*?<\\/script>/gi, ' ').replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\\s+/g, ' ').trim();\nreturn [{ json: { url: $('Normalize input').first().json.url, source_text: text.slice(0, 15000), angle: $('Normalize input').first().json.angle } }];"
+      },
+      "id": "441b9a79-8d84-5831-a815-1b46e953529c",
+      "name": "Page to text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Angle requested: {{ $json.angle || 'pick the strongest one' }}\n\nSOURCE:\n{{ $json.source_text }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You repurpose one piece of source material into platform-native drafts. Keep every claim traceable to the source; do not add numbers that are not in it.\nVoice: {{ $('Config').first().json.voice }}\nX thread: 4-8 tweets, each under 270 characters, first tweet is the hook, last tweet has the CTA/link placeholder [LINK].\nLinkedIn: 120-220 words, short paragraphs, one clear takeaway, ends with a question.\nhooks: three alternative first lines."
+            }
+          ]
+        }
+      },
+      "id": "f36796cc-ac98-580c-98ed-aa66cdb581c1",
+      "name": "Write drafts",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "6a1870dd-83ed-5fca-a25b-2dc137015fe4",
+      "name": "Write drafts - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1368,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"x_thread\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"linkedin_post\": {\n      \"type\": \"string\"\n    },\n    \"hooks\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    }\n  },\n  \"required\": [\n    \"x_thread\",\n    \"linkedin_post\",\n    \"hooks\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "6e1dfac4-717f-59da-b8b3-33af22355113",
+      "name": "Write drafts - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const o = $input.first().json.output;\nconst thread = (o.x_thread || []).map((t, i) => ({ n: i + 1, text: t, chars: t.length, over: t.length > 280 }));\nreturn [{ json: { thread, x_thread_text: thread.map(t => t.text).join('\\n---\\n'), linkedin_post: o.linkedin_post,\n  linkedin_chars: (o.linkedin_post || '').length, hooks: o.hooks, warnings: thread.filter(t => t.over).map(t => 'Tweet ' + t.n + ' is ' + t.chars + ' chars') } }];"
+      },
+      "id": "1ea7d5bc-775a-50c3-b73e-84716d1e5b95",
+      "name": "Check lengths",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "content_queue"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "created_at": "={{ $now.toISO() }}",
+            "source": "={{ $('Normalize input').first().json.url || 'text' }}",
+            "x_thread": "={{ $json.x_thread_text }}",
+            "linkedin_post": "={{ $json.linkedin_post }}",
+            "warnings": "={{ $json.warnings.join('; ') }}",
+            "status": "draft"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "x_thread",
+              "displayName": "x_thread",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "linkedin_post",
+              "displayName": "linkedin_post",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "warnings",
+              "displayName": "warnings",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "b338798a-5b79-5698-ab3f-2628735876c7",
+      "name": "Log drafts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1920,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Check lengths').first().json) }}",
+        "options": {}
+      },
+      "id": "c813c878-3a4a-5011-9a56-87f15b23045c",
+      "name": "Return drafts",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Write drafts - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write drafts",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write drafts - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Write drafts",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Source webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Normalize input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize input": {
+      "main": [
+        [
+          {
+            "node": "Is it a URL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is it a URL?": {
+      "main": [
+        [
+          {
+            "node": "Fetch page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Write drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch page": {
+      "main": [
+        [
+          {
+            "node": "Page to text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page to text": {
+      "main": [
+        [
+          {
+            "node": "Write drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write drafts": {
+      "main": [
+        [
+          {
+            "node": "Check lengths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check lengths": {
+      "main": [
+        [
+          {
+            "node": "Log drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log drafts": {
+      "main": [
+        [
+          {
+            "node": "Return drafts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "content"
+    }
+  ]
+}

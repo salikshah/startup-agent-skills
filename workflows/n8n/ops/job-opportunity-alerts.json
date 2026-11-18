@@ -1,0 +1,304 @@
+{
+  "name": "Job alerts: Greenhouse/Lever/Ashby boards -> filter -> dedupe -> Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Job / opportunity alerts (original)\nDaily 07:00: pulls public job boards of the companies you list (Greenhouse, Lever, Ashby public APIs, no keys), filters by title keywords, locations and freshness, flags roles whose text mentions visa sponsorship, drops roles already sent, and posts a Telegram digest.\nIt never applies for you.",
+        "height": 240,
+        "width": 500
+      },
+      "id": "a901edc5-6661-53b6-bbbd-8ed0b125694f",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "id": "13a73e8e-ceff-56a2-8e51-60158c03b8e4",
+      "name": "Daily 07:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "43a08018-67ee-54ad-a24e-49844faa0569",
+              "name": "greenhouse_boards",
+              "value": "={{ [\"anthropic\", \"gitlab\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "ffb4d430-a87a-5b15-bf7d-9d5795c9fef4",
+              "name": "lever_companies",
+              "value": "={{ [\"mistral\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "4e85de70-f6b5-542c-af07-096a52da3f29",
+              "name": "ashby_boards",
+              "value": "={{ [\"openai\", \"cohere\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "92455648-5e46-5696-b644-0e6d89ec8726",
+              "name": "title_keywords",
+              "value": "={{ [\"engineer\", \"developer advocate\", \"solutions\", \"product manager\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "f6370434-d6be-5668-9220-350a326dbf33",
+              "name": "exclude_keywords",
+              "value": "={{ [\"intern\", \"principal\", \"director\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "f09c787e-b04a-53ca-8a30-323b7904f01d",
+              "name": "locations",
+              "value": "={{ [\"germany\", \"berlin\", \"munich\", \"netherlands\", \"amsterdam\", \"united kingdom\", \"london\", \"remote\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "1aff6a73-e474-5a87-b878-30190698472f",
+              "name": "sponsorship_terms",
+              "value": "={{ [\"visa sponsorship\", \"sponsor visas\", \"relocation support\", \"skilled worker visa\", \"highly skilled migrant\", \"blue card\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "c902906d-d90e-5930-bb28-f1d7d0666672",
+              "name": "max_age_days",
+              "value": 14,
+              "type": "number"
+            },
+            {
+              "id": "844274a7-9458-5cda-903f-e1435f1ff925",
+              "name": "telegram_chat_id",
+              "value": "REPLACE_WITH_YOUR_TELEGRAM_CHAT_ID",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d051eb56-3b45-5696-a32b-5a416860e023",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst out = [];\nfor (const c of cfg.greenhouse_boards) out.push({ ats: 'greenhouse', company: c, url: 'https://boards-api.greenhouse.io/v1/boards/' + c + '/jobs?content=true' });\nfor (const c of cfg.lever_companies) out.push({ ats: 'lever', company: c, url: 'https://api.lever.co/v0/postings/' + c + '?mode=json' });\nfor (const c of cfg.ashby_boards) out.push({ ats: 'ashby', company: c, url: 'https://api.ashbyhq.com/posting-api/job-board/' + c });\nreturn out.map(json => ({ json }));"
+      },
+      "id": "4b8c4033-5103-54d1-823e-64680ba83b60",
+      "name": "Build board URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "1fa69930-3fe8-5e19-95ca-5d8f999adc7f",
+      "name": "Fetch board",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalise Greenhouse / Lever / Ashby responses and filter by title, location, freshness.\nconst cfg = $('Config').first().json;\nconst boards = $('Build board URLs').all();\nconst lc = s => String(s || '').toLowerCase();\nconst strip = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ');\nconst jobs = [];\nfor (const it of $input.all()) {\n  const pi = Array.isArray(it.pairedItem) ? it.pairedItem[0] : it.pairedItem;\n  const src = (boards[(pi && pi.item) || 0] || {}).json || {};\n  const j = it.json;\n  if (j.error) continue;\n  if (src.ats === 'greenhouse') for (const x of j.jobs || []) jobs.push({ company: src.company, title: x.title, location: (x.location || {}).name, url: x.absolute_url, date: x.updated_at, text: strip(x.content) });\n  else if (src.ats === 'ashby') for (const x of j.jobs || []) jobs.push({ company: src.company, title: x.title, location: (x.location || '') + (x.isRemote ? ' Remote' : ''), url: x.jobUrl, date: x.publishedAt, text: x.descriptionPlain });\n  else if (src.ats === 'lever' && j.text) jobs.push({ company: src.company, title: j.text, location: ((j.categories || {}).location || '') + ' ' + (j.workplaceType || ''), url: j.hostedUrl, date: j.createdAt ? new Date(j.createdAt).toISOString() : '', text: j.descriptionPlain });\n}\nconst titles = cfg.title_keywords.map(lc), locs = cfg.locations.map(lc), visa = cfg.sponsorship_terms.map(lc), excl = cfg.exclude_keywords.map(lc);\nconst minDate = Date.now() - Number(cfg.max_age_days) * 86400000;\nreturn jobs.filter(x => titles.some(k => lc(x.title).includes(k)) && !excl.some(k => lc(x.title).includes(k))\n    && locs.some(k => lc(x.location).includes(k)) && (!x.date || Date.parse(x.date) >= minDate))\n  .map(x => ({ json: { ...x, sponsorship_mentioned: visa.some(k => lc(x.text).includes(k)), text: undefined } }));"
+      },
+      "id": "4c4d8ae3-9fe1-5a5a-ae9b-359092002942",
+      "name": "Normalize and filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "dedupeValue": "={{ $json.url }}",
+        "options": {}
+      },
+      "id": "219d9d6a-fdd1-5725-a397-d5a4ee45ae28",
+      "name": "Skip roles already sent",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(i => i.json).sort((a, b) => Number(b.sponsorship_mentioned) - Number(a.sponsorship_mentioned));\nif (!items.length) return [];\nconst text = items.length + ' new matching role(s)\\n\\n' + items.map(x => (x.sponsorship_mentioned ? '[visa] ' : '') + x.company + ' | ' + x.title + ' | ' + x.location + '\\n' + x.url).join('\\n\\n');\nreturn [{ json: { text: text.slice(0, 4000) } }];"
+      },
+      "id": "833c1b9b-4dd2-57dd-bca0-b3aa2f5dfd92",
+      "name": "Format digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Config').first().json.telegram_chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "43b90145-6fc8-53fd-9db0-8c5236c74b3b",
+      "name": "Send to Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1680,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 07:00": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Build board URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build board URLs": {
+      "main": [
+        [
+          {
+            "node": "Fetch board",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch board": {
+      "main": [
+        [
+          {
+            "node": "Normalize and filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize and filter": {
+      "main": [
+        [
+          {
+            "node": "Skip roles already sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip roles already sent": {
+      "main": [
+        [
+          {
+            "node": "Format digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format digest": {
+      "main": [
+        [
+          {
+            "node": "Send to Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "ops"
+    }
+  ]
+}

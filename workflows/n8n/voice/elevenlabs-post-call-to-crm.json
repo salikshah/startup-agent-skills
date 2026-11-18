@@ -1,0 +1,511 @@
+{
+  "name": "ElevenLabs post-call webhook to sheet + follow-up Gmail draft",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Post-call webhook (original)\nElevenLabs sends `post_call_transcription` after each agent call. This verifies the HMAC signature, logs the call to Google Sheets and, when the caller left an email, writes a follow-up as a **Gmail draft** (never sent automatically).\nSet the agent's *Data collection* fields `name`, `email`, `follow_up`.",
+        "height": 240,
+        "width": 480
+      },
+      "id": "1fffe195-5a16-5e9d-93e3-c28becfa0130",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "elevenlabs-post-call",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "997eb54c-8c6e-552b-83ba-514572079158",
+      "name": "Post-call webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "470fe95f-05aa-5f8c-95c3-bddb174af2f0"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2e0faf19-074d-5563-a41d-da0765e75f6a",
+              "name": "webhook_secret",
+              "value": "REPLACE_WITH_ELEVENLABS_WEBHOOK_SECRET",
+              "type": "string"
+            },
+            {
+              "id": "6e4ca0e1-ac0b-518b-8e70-13241c7d4630",
+              "name": "allow_unsigned",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "4cbeadf0-673d-56fd-955e-4e07eeacdedc",
+              "name": "sheet_url",
+              "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit",
+              "type": "string"
+            },
+            {
+              "id": "5a622b42-21ab-5985-a184-0ea3dab7347c",
+              "name": "company_name",
+              "value": "Acme",
+              "type": "string"
+            },
+            {
+              "id": "bc188c0c-a7c3-5e81-8f79-2e2184070efe",
+              "name": "sender_name",
+              "value": "Your Name",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "8ba5b1ea-80a2-5319-9fa1-0ac23066d6c6",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify the ElevenLabs post-call webhook HMAC (header: elevenlabs-signature: t=<ts>,v0=<hex>).\n// Needs NODE_FUNCTION_ALLOW_BUILTIN=crypto on the n8n container.\nconst crypto = require('crypto');\nconst cfg = $('Config').first().json;\nconst item = $('Post-call webhook').first();\nconst headers = item.json.headers || {};\nlet raw = '';\ntry { raw = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8'); } catch (e) { raw = JSON.stringify(item.json.body || {}); }\nlet body = item.json.body;\nif (!body || !Object.keys(body).length) body = JSON.parse(raw || '{}');\nlet valid = false, reason = '';\nif (!cfg.webhook_secret || String(cfg.webhook_secret).startsWith('REPLACE')) {\n  valid = cfg.allow_unsigned === true; reason = 'webhook_secret not set';\n} else {\n  const parts = Object.fromEntries(String(headers['elevenlabs-signature'] || '').split(',').map(p => p.split('=')));\n  const expected = crypto.createHmac('sha256', cfg.webhook_secret).update(parts.t + '.' + raw).digest('hex');\n  const fresh = Math.abs(Date.now() / 1000 - Number(parts.t)) < 1800;\n  valid = Boolean(parts.v0) && parts.v0 === expected && fresh;\n  reason = valid ? 'ok' : 'bad or stale signature';\n}\nconst d = body.data || {};\nconst a = d.analysis || {};\nconst dc = a.data_collection_results || {};\nconst val = k => (dc[k] && dc[k].value) || '';\nconst transcript = (d.transcript || []).map(t => t.role + ': ' + (t.message || '')).join('\\n');\nreturn [{ json: { valid, reason, type: body.type, conversation_id: d.conversation_id, agent_id: d.agent_id,\n  duration_secs: (d.metadata || {}).call_duration_secs, call_successful: a.call_successful, summary: a.transcript_summary || '',\n  caller_name: val('name'), caller_email: val('email'), follow_up: val('follow_up'), transcript: transcript.slice(0, 12000) } }];"
+      },
+      "id": "87b62dcc-0996-52d9-a36a-f6a7c9a94e6a",
+      "name": "Verify and extract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "842fde59-8f97-5892-8ede-d6f5be556dc8",
+              "leftValue": "={{ $json.valid }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "8a9d1b1f-bb90-59cd-ac04-7fabd64fa9ca",
+              "leftValue": "={{ $json.type }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "post_call_transcription"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "611f5ea0-7899-53c8-b71e-9778f67f08d6",
+      "name": "Valid transcription?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "voice_calls"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $now.toISO() }}",
+            "conversation_id": "={{ $json.conversation_id }}",
+            "agent_id": "={{ $json.agent_id }}",
+            "duration_secs": "={{ $json.duration_secs }}",
+            "successful": "={{ $json.call_successful }}",
+            "caller_name": "={{ $json.caller_name }}",
+            "caller_email": "={{ $json.caller_email }}",
+            "summary": "={{ $json.summary }}",
+            "follow_up": "={{ $json.follow_up }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "agent_id",
+              "displayName": "agent_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "duration_secs",
+              "displayName": "duration_secs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "successful",
+              "displayName": "successful",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_name",
+              "displayName": "caller_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "caller_email",
+              "displayName": "caller_email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "follow_up",
+              "displayName": "follow_up",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "9738e5e6-10f8-562f-abed-fe596b211022",
+      "name": "Log call",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "aedb7ec4-ab2d-5b26-b0ce-f59d4f541090",
+              "leftValue": "={{ $('Verify and extract').first().json.caller_email }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2fb5b653-54bd-5405-955f-4725a426c2b9",
+      "name": "Caller left an email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Caller: {{ $('Verify and extract').first().json.caller_name }}\nSummary: {{ $('Verify and extract').first().json.summary }}\nRequested follow-up: {{ $('Verify and extract').first().json.follow_up }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You write a short, warm follow-up email from {{ $('Config').first().json.sender_name }} at {{ $('Config').first().json.company_name }} after a phone call with an AI assistant. Reference what the caller asked for. Under 120 words, plain text, no promises the summary does not support."
+            }
+          ]
+        }
+      },
+      "id": "d6b47851-711f-53f6-a485-59da3e8ac9a7",
+      "name": "Write follow-up",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "4c650455-2bca-53e6-b4d0-2ea2776fe4fd",
+      "name": "Write follow-up - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1368,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"subject\": {\n      \"type\": \"string\"\n    },\n    \"body\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"subject\",\n    \"body\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "acc493da-ff71-5ddc-9fc3-0b4a903e16ff",
+      "name": "Write follow-up - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "operation": "create",
+        "subject": "={{ $json.output.subject }}",
+        "message": "={{ $json.output.body }}",
+        "emailType": "text",
+        "options": {
+          "sendTo": "={{ $('Verify and extract').first().json.caller_email }}"
+        }
+      },
+      "id": "52d2e56f-2236-567d-8a96-2600db84779e",
+      "name": "Create Gmail draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1680,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Write follow-up - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Write follow-up",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write follow-up - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Write follow-up",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post-call webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Verify and extract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify and extract": {
+      "main": [
+        [
+          {
+            "node": "Valid transcription?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid transcription?": {
+      "main": [
+        [
+          {
+            "node": "Log call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log call": {
+      "main": [
+        [
+          {
+            "node": "Caller left an email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Caller left an email?": {
+      "main": [
+        [
+          {
+            "node": "Write follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write follow-up": {
+      "main": [
+        [
+          {
+            "node": "Create Gmail draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "voice"
+    }
+  ]
+}

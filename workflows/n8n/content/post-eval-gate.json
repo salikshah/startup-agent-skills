@@ -1,0 +1,556 @@
+{
+  "name": "Post-eval gate: score a draft, publish only after human approval",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Post-eval gate (original, mirrors `skills/00-post-eval`)\nPOST a draft -> 100-point rubric (20/25/20/15/20) -> hard gates (no link caps proof at 10; over-length fails) -> instant JSON verdict.\nIf the score >= `threshold` (default 70) the approver gets an email with **Approve / Skip**. Approved drafts go to a `publish_queue` sheet. The *Publish to X* node ships **disabled**: enable it only if you want approved posts to go out automatically.",
+        "height": 300,
+        "width": 560
+      },
+      "id": "ad48f5eb-3c30-5f6c-8470-1f066ac10563",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "post-eval",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5d16a047-9122-5d07-a96c-6f0aa04f920c",
+      "name": "Draft webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "86e5be80-2e0a-5185-8952-b8ae9e2acb70"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f58772d4-a767-50ea-a85b-36c84bedd6c8",
+              "name": "threshold",
+              "value": 70,
+              "type": "number"
+            },
+            {
+              "id": "39d8acd2-2973-5d42-ad40-ba03c0c549e8",
+              "name": "approver_email",
+              "value": "you@example.com",
+              "type": "string"
+            },
+            {
+              "id": "4cbeadf0-673d-56fd-955e-4e07eeacdedc",
+              "name": "sheet_url",
+              "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit",
+              "type": "string"
+            },
+            {
+              "id": "77b6304d-6ce6-52c6-af3c-203550157e8a",
+              "name": "positioning",
+              "value": "Founder building open-source AI developer tools",
+              "type": "string"
+            },
+            {
+              "id": "a4307826-08ac-5473-a973-911711f83010",
+              "name": "audience",
+              "value": "Developers and early-stage founders",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "6ef965dc-59b7-5a16-85ee-02f5da78958d",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body || {};\nconst draft = String(b.draft || b.text || '').trim();\nif (!draft) throw new Error('Send JSON with \"draft\" and \"platform\" (x or linkedin).');\nconst platform = String(b.platform || '').toLowerCase().includes('linked') ? 'linkedin' : (b.platform ? 'x' : '');\nif (!platform) throw new Error('platform is required: \"x\" or \"linkedin\". The post-eval skill asks before scoring when it is unclear.');\nconst limit = platform === 'x' ? 280 : 1500;\nconst hasLink = /https?:\\/\\/\\S+/.test(draft) || Boolean(b.proof_url);\nreturn [{ json: { draft, platform, limit, chars: draft.length, over_limit: draft.length > limit, has_link: hasLink,\n  proof_url: b.proof_url || '', author_goal: b.author_goal || '' } }];"
+      },
+      "id": "5c4f2de6-6c0c-587c-b69d-6663eaf85577",
+      "name": "Prepare draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Platform: {{ $json.platform }} (limit {{ $json.limit }} chars, draft is {{ $json.chars }})\nHas a link/artefact: {{ $json.has_link }} {{ $json.proof_url }}\nAuthor goal for this post: {{ $json.author_goal || 'not given' }}\n\nDRAFT:\n{{ $json.draft }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You are the post-eval skill from github.com/salikshah/startup-agent-skills (skills/00-post-eval).\nScore the draft for the author's goals. Integers only.\n1. strategic_alignment (0-20): advances the stated positioning, shows expertise rather than intent, clear CTA, right audience.\n2. proof_of_work (0-25): links to something concrete (repo, audit, case study), shows results, evidence the author can do it.\n3. content_quality (0-20): hook stops the scroll, value clear in two sentences, authentic tone (not corporate, not AI-sounding), concise.\n4. timing (0-15): reason to post now, rides a current conversation, audience is active.\n5. risk (0-20): 20 = no risk. Deduct for negative attention, leaking unlaunched work, promises the author can't keep, easy misreadings.\nGive 2-4 pros, 2-4 cons, the gaps, one specific recommendation and one improved rewrite in the author's voice.\n\nAuthor positioning: {{ $('Config').first().json.positioning }}\nTarget audience: {{ $('Config').first().json.audience }}"
+            }
+          ]
+        }
+      },
+      "id": "9ba71438-9728-585d-a01e-ac14427e9f41",
+      "name": "Score with post-eval rubric",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "c1db4abe-b524-5015-8a70-1e8c1e115c74",
+      "name": "Score with post-eval rubric - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        648,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"strategic_alignment\": {\n      \"type\": \"number\"\n    },\n    \"proof_of_work\": {\n      \"type\": \"number\"\n    },\n    \"content_quality\": {\n      \"type\": \"number\"\n    },\n    \"timing\": {\n      \"type\": \"number\"\n    },\n    \"risk\": {\n      \"type\": \"number\"\n    },\n    \"pros\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"cons\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"gaps\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"recommendation\": {\n      \"type\": \"string\"\n    },\n    \"rewrite\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"strategic_alignment\",\n    \"proof_of_work\",\n    \"content_quality\",\n    \"timing\",\n    \"risk\",\n    \"pros\",\n    \"cons\",\n    \"gaps\",\n    \"recommendation\",\n    \"rewrite\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "f76f54a2-f4bb-5f8d-8806-3f6fe43100b0",
+      "name": "Score with post-eval rubric - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        840,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Apply the post-eval skill's hard rules on top of the model's scores.\nconst cfg = $('Config').first().json;\nconst p = $('Prepare draft').first().json;\nconst o = $input.first().json.output;\nconst clamp = (v, max) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));\nconst s = {\n  strategic_alignment: clamp(o.strategic_alignment, 20),\n  proof_of_work: clamp(o.proof_of_work, 25),\n  content_quality: clamp(o.content_quality, 20),\n  timing: clamp(o.timing, 15),\n  risk: clamp(o.risk, 20),\n};\nconst notes = [];\nif (!p.has_link && s.proof_of_work > 10) { s.proof_of_work = 10; notes.push('No link or artefact: proof of work capped at 10/25.'); }\nif (p.over_limit) notes.push(p.platform + ' draft is ' + p.chars + ' chars; limit ' + p.limit + '.');\nconst total = Object.values(s).reduce((a, b) => a + b, 0);\nconst verdict = total >= Number(cfg.threshold) && !p.over_limit ? 'POST' : \"DON'T POST\";\nreturn [{ json: { verdict, score: total, threshold: Number(cfg.threshold), scores: s, notes,\n  pros: o.pros, cons: o.cons, gaps: o.gaps, recommendation: o.recommendation, rewrite: o.rewrite,\n  draft: p.draft, platform: p.platform } }];"
+      },
+      "id": "939b2cc9-2de2-54ac-8d73-1e7fa340002f",
+      "name": "Apply gates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "5e02bb95-bbaa-5391-a2e4-4df9a417234b",
+      "name": "Return verdict",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b9da1098-9732-5b7d-acd7-f8c362f5c76e",
+              "leftValue": "={{ $json.verdict }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "POST"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9d31c27b-c0d4-523f-85f3-cbab332f3271",
+      "name": "Verdict is POST?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "sendTo": "={{ $('Config').first().json.approver_email }}",
+        "subject": "={{ 'Post-eval ' + $json.score + '/100 (' + $json.platform + '): approve?' }}",
+        "message": "={{ $json.draft + '\\n\\n---\\nScore ' + $json.score + '/100. ' + $json.notes.join(' ') + '\\nRecommendation: ' + $json.recommendation }}",
+        "responseType": "approval",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Approve",
+            "disapproveLabel": "Skip"
+          }
+        },
+        "options": {
+          "appendAttribution": false,
+          "limitWaitTime": {
+            "values": {
+              "limitType": "afterTimeInterval",
+              "resumeAmount": 48,
+              "resumeUnit": "hours"
+            }
+          }
+        }
+      },
+      "id": "4c1ee96c-a90f-5904-9523-8696064f648a",
+      "name": "Ask approver",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1680,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a6dfe5c3-267c-5eef-b244-3f9eb545d3df",
+              "leftValue": "={{ $json.data.approved }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "12b88a9c-e7f2-5309-84e1-5cfe9ec6627b",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "publish_queue"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "approved_at": "={{ $now.toISO() }}",
+            "platform": "={{ $('Apply gates').first().json.platform }}",
+            "score": "={{ $('Apply gates').first().json.score }}",
+            "draft": "={{ $('Apply gates').first().json.draft }}",
+            "status": "approved"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "approved_at",
+              "displayName": "approved_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "platform",
+              "displayName": "platform",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "draft",
+              "displayName": "draft",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "f0e6cb41-3e27-5015-9127-5bcb7f6b0c91",
+      "name": "Add to publish queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2160,
+        -100
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $('Apply gates').first().json.draft }}",
+        "additionalFields": {}
+      },
+      "id": "707410ae-d9bc-5cdf-8e4d-1396ad9db29d",
+      "name": "Publish to X (disabled)",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        -100
+      ],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "X OAuth2"
+        }
+      },
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Score with post-eval rubric - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Score with post-eval rubric",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score with post-eval rubric - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Score with post-eval rubric",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Prepare draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare draft": {
+      "main": [
+        [
+          {
+            "node": "Score with post-eval rubric",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score with post-eval rubric": {
+      "main": [
+        [
+          {
+            "node": "Apply gates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply gates": {
+      "main": [
+        [
+          {
+            "node": "Return verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return verdict": {
+      "main": [
+        [
+          {
+            "node": "Verdict is POST?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verdict is POST?": {
+      "main": [
+        [
+          {
+            "node": "Ask approver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask approver": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Add to publish queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to publish queue": {
+      "main": [
+        [
+          {
+            "node": "Publish to X (disabled)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "content"
+    }
+  ]
+}

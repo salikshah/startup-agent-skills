@@ -1,0 +1,519 @@
+{
+  "name": "Chatwoot resolved conversations to feedback log",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Resolved conversation insights (original)\nWhen a Chatwoot conversation is resolved: summarise it, extract product feedback, bugs and churn risk, append a row to Google Sheets, and alert Slack on high churn risk or a bug.\nSubscribe the Chatwoot webhook to `conversation_status_changed`.",
+        "height": 240,
+        "width": 480
+      },
+      "id": "72af360c-7883-59fb-bfd2-d43058ac8399",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chatwoot-resolved",
+        "options": {}
+      },
+      "id": "4f17e71f-85ad-5431-84df-85ac29cdcbf6",
+      "name": "Chatwoot webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "7bccdf89-eec1-51e2-9c8f-551d45989b92"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8798da47-b10a-5f6f-b3da-546ea91f8ace",
+              "name": "chatwoot_url",
+              "value": "http://chatwoot:3000",
+              "type": "string"
+            },
+            {
+              "id": "4cbeadf0-673d-56fd-955e-4e07eeacdedc",
+              "name": "sheet_url",
+              "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit",
+              "type": "string"
+            },
+            {
+              "id": "c69cf90e-a2c3-54ea-af3f-9cc4bf5fb545",
+              "name": "slack_channel_id",
+              "value": "C0123456789",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "17e9cee6-5b2b-5567-beb6-ac3f71118321",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keep only conversations that just became resolved.\nconst b = $input.first().json.body || {};\nconst conv = b.conversation || b;\nconst status = conv.status || b.status;\nif (!['conversation_status_changed', 'conversation_resolved'].includes(b.event) || status !== 'resolved') return [];\nreturn [{ json: {\n  account_id: (b.account && b.account.id) || conv.account_id,\n  conversation_id: conv.id,\n  contact: (conv.meta && conv.meta.sender && (conv.meta.sender.email || conv.meta.sender.name)) || '',\n  labels: (conv.labels || []).join(', ')\n} }];"
+      },
+      "id": "069a4602-dd01-59d8-b0dc-4e321b926854",
+      "name": "Only resolved",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.chatwoot_url }}/api/v1/accounts/{{ $json.account_id }}/conversations/{{ $json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "266a6542-d581-5289-ba30-c1bd066340d8",
+      "name": "Get messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Header Auth (set in n8n)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.payload || [];\nconst lines = raw.filter(m => m.content && !m.private && m.message_type !== 2)\n  .map(m => (m.message_type === 0 ? 'Customer: ' : 'Support: ') + String(m.content).replace(/\\s+/g, ' '));\nreturn [{ json: { transcript: lines.join('\\n').slice(0, 15000) } }];"
+      },
+      "id": "a97d5fc8-48bc-56ca-a9ac-8e50e9d52a12",
+      "name": "Transcript",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Transcript:\n{{ $json.transcript }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You analyse resolved customer-support conversations for a startup. Be factual and quote the customer where useful. Use empty arrays when nothing applies."
+            }
+          ]
+        }
+      },
+      "id": "e6b8bf81-92e6-55cc-a466-447dabf1608c",
+      "name": "Extract insights",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "2b2fe9d9-10d8-5381-bff8-4711edb5a56a",
+      "name": "Extract insights - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1128,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"topic\": {\n      \"type\": \"string\"\n    },\n    \"summary\": {\n      \"type\": \"string\"\n    },\n    \"sentiment\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"positive\",\n        \"neutral\",\n        \"negative\"\n      ]\n    },\n    \"product_feedback\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"feature_requests\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"bug_reports\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"string\"\n      }\n    },\n    \"churn_risk\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"low\",\n        \"medium\",\n        \"high\"\n      ]\n    },\n    \"customer_quote\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"topic\",\n    \"summary\",\n    \"sentiment\",\n    \"product_feedback\",\n    \"feature_requests\",\n    \"bug_reports\",\n    \"churn_risk\",\n    \"customer_quote\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "59b11ff7-5da0-5ba1-9a0c-084c85d3170c",
+      "name": "Extract insights - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "support_insights"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "date": "={{ $now.toISODate() }}",
+            "conversation_id": "={{ $('Only resolved').first().json.conversation_id }}",
+            "contact": "={{ $('Only resolved').first().json.contact }}",
+            "topic": "={{ $json.output.topic }}",
+            "summary": "={{ $json.output.summary }}",
+            "sentiment": "={{ $json.output.sentiment }}",
+            "churn_risk": "={{ $json.output.churn_risk }}",
+            "feature_requests": "={{ $json.output.feature_requests.join('; ') }}",
+            "bug_reports": "={{ $json.output.bug_reports.join('; ') }}",
+            "quote": "={{ $json.output.customer_quote }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "contact",
+              "displayName": "contact",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "topic",
+              "displayName": "topic",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sentiment",
+              "displayName": "sentiment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "churn_risk",
+              "displayName": "churn_risk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "feature_requests",
+              "displayName": "feature_requests",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "bug_reports",
+              "displayName": "bug_reports",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "quote",
+              "displayName": "quote",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "3b3d0a5c-8654-5dc6-8c2b-9a43fcb00763",
+      "name": "Log to sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1440,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8db784fb-e7ac-504f-8c58-3cebf069c158",
+              "leftValue": "={{ $('Extract insights').item.json.output.churn_risk }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "high"
+            },
+            {
+              "id": "8b7303c1-b10a-50cb-996e-72ba35c77bbc",
+              "leftValue": "={{ $('Extract insights').item.json.output.bug_reports.length }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": 0
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "0d63c1c0-def6-584b-9044-f23c70059ffa",
+      "name": "Needs attention?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config').first().json.slack_channel_id }}"
+        },
+        "text": "=:rotating_light: Support conversation {{ $('Only resolved').first().json.conversation_id }} needs a look\n*Topic:* {{ $('Extract insights').item.json.output.topic }} | *Churn risk:* {{ $('Extract insights').item.json.output.churn_risk }}\n{{ $('Extract insights').item.json.output.summary }}\nBugs: {{ $('Extract insights').item.json.output.bug_reports.join('; ') || 'none' }}",
+        "otherOptions": {}
+      },
+      "id": "57f98a3c-710d-5653-94d6-25d45f3f2f42",
+      "name": "Alert Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1920,
+        -200
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Extract insights - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract insights",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract insights - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Extract insights",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chatwoot webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Only resolved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Only resolved": {
+      "main": [
+        [
+          {
+            "node": "Get messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get messages": {
+      "main": [
+        [
+          {
+            "node": "Transcript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcript": {
+      "main": [
+        [
+          {
+            "node": "Extract insights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract insights": {
+      "main": [
+        [
+          {
+            "node": "Log to sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to sheet": {
+      "main": [
+        [
+          {
+            "node": "Needs attention?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs attention?": {
+      "main": [
+        [
+          {
+            "node": "Alert Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "chatwoot"
+    }
+  ]
+}

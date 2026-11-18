@@ -22,3 +22,6 @@ jobs:
 
       - name: Static evals
         run: python tools/run_evals.py
+
+      - name: Validate workflows
+        run: python workflows/tools/validate_workflows.py

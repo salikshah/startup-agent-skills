@@ -1,0 +1,600 @@
+{
+  "name": "Lead capture: enrich from website, score ICP fit, upsert to sheet CRM, alert Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Lead capture + enrichment (original)\nPOST form data (`email`, `name`, `company`, `website`, `message`). Drops bots (honeypot `company_website_confirm`) and invalid emails, reads the company homepage, scores fit against your ICP, upserts on `email` in a Google Sheet CRM, and pings Slack for strong fits.\nNo outbound email is sent.",
+        "height": 240,
+        "width": 500
+      },
+      "id": "0da077d0-8c04-5344-a40b-813b05f36841",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead",
+        "options": {}
+      },
+      "id": "a26cd7a9-503d-5dfd-9c2d-a0119a70d19d",
+      "name": "Lead webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "c7a6f26d-8be2-5a2e-9435-bf798eea60d7"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4cbeadf0-673d-56fd-955e-4e07eeacdedc",
+              "name": "sheet_url",
+              "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit",
+              "type": "string"
+            },
+            {
+              "id": "c69cf90e-a2c3-54ea-af3f-9cc4bf5fb545",
+              "name": "slack_channel_id",
+              "value": "C0123456789",
+              "type": "string"
+            },
+            {
+              "id": "dc22eb7d-9433-5de2-9ebc-4c70ac8e44fe",
+              "name": "fit_threshold",
+              "value": 70,
+              "type": "number"
+            },
+            {
+              "id": "c5b28f73-8271-5f73-949b-a0023f18f3b3",
+              "name": "icp",
+              "value": "B2B SaaS, 5-200 employees, engineering-led, selling to developers",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "2a2ef298-5454-584c-b32b-ab9f83506fc9",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const FREE = ['gmail.com','googlemail.com','yahoo.com','hotmail.com','outlook.com','live.com','icloud.com','proton.me','protonmail.com','aol.com','gmx.de','web.de'];\nconst b = $input.first().json.body || {};\nif (b.company_website_confirm) return []; // honeypot field filled by bots\nconst email = String(b.email || '').trim().toLowerCase();\nif (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) return [];\nconst emailDomain = email.split('@')[1];\nlet site = String(b.website || '').trim();\nif (!site && !FREE.includes(emailDomain)) site = 'https://' + emailDomain;\nif (site && !/^https?:\\/\\//.test(site)) site = 'https://' + site;\nreturn [{ json: { email, name: String(b.name || '').trim(), company: String(b.company || '').trim(), website: site,\n  message: String(b.message || '').slice(0, 2000), source: b.source || 'website', free_email: FREE.includes(emailDomain) } }];"
+      },
+      "id": "f0229eac-b455-5ca2-81db-53df8e9f2a6e",
+      "name": "Normalize lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a2d242cf-4b93-5964-b17a-14cd511fa0a6",
+              "leftValue": "={{ $json.website }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "3f26ed61-3614-5a41-bb48-b8aafbdfbe22",
+      "name": "Has a website?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.website }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "ec72cc56-35be-5c91-bb04-f2cab2f4f18d",
+      "name": "Fetch homepage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        -200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const lead = $('Normalize lead').first().json;\nconst html = String($input.first().json.data || '');\nconst text = html.replace(/<script[\\s\\S]*?<\\/script>/gi, ' ').replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 6000);\nreturn [{ json: { ...lead, site_text: text } }];"
+      },
+      "id": "e17f266b-6524-503a-811d-c1d37d2ad9a5",
+      "name": "Homepage to text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Form: {{ JSON.stringify({ name: $json.name, email: $json.email, company: $json.company, website: $json.website, message: $json.message, free_email: $json.free_email }) }}\n\nHomepage text:\n{{ $json.site_text || 'not available' }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You qualify inbound B2B leads. ICP: {{ $('Config').first().json.icp }}\nUse only the form data and homepage text. If something is unknown, say \"unknown\"; never guess revenue or headcount as fact.\nicp_fit is 0-100."
+            }
+          ]
+        }
+      },
+      "id": "a5a6d8e9-8ee7-5464-bf1e-dfe959aaa39d",
+      "name": "Enrich and score",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "771cfa74-8ffa-516a-aa1e-d54c33b7fc8a",
+      "name": "Enrich and score - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1368,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"company_summary\": {\n      \"type\": \"string\"\n    },\n    \"industry\": {\n      \"type\": \"string\"\n    },\n    \"company_size_guess\": {\n      \"type\": \"string\"\n    },\n    \"icp_fit\": {\n      \"type\": \"number\"\n    },\n    \"fit_reason\": {\n      \"type\": \"string\"\n    },\n    \"intent\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"high\",\n        \"medium\",\n        \"low\"\n      ]\n    },\n    \"next_step\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"company_summary\",\n    \"industry\",\n    \"company_size_guess\",\n    \"icp_fit\",\n    \"fit_reason\",\n    \"intent\",\n    \"next_step\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "8f34e2be-7684-5db4-b1fd-bb1c63bc5138",
+      "name": "Enrich and score - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "leads"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $('Normalize lead').first().json.email }}",
+            "name": "={{ $('Normalize lead').first().json.name }}",
+            "company": "={{ $('Normalize lead').first().json.company }}",
+            "website": "={{ $('Normalize lead').first().json.website }}",
+            "message": "={{ $('Normalize lead').first().json.message }}",
+            "source": "={{ $('Normalize lead').first().json.source }}",
+            "summary": "={{ $json.output.company_summary }}",
+            "industry": "={{ $json.output.industry }}",
+            "size": "={{ $json.output.company_size_guess }}",
+            "icp_fit": "={{ $json.output.icp_fit }}",
+            "intent": "={{ $json.output.intent }}",
+            "next_step": "={{ $json.output.next_step }}",
+            "updated_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message",
+              "displayName": "message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "industry",
+              "displayName": "industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "size",
+              "displayName": "size",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "icp_fit",
+              "displayName": "icp_fit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "intent",
+              "displayName": "intent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "next_step",
+              "displayName": "next_step",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "995a6947-4ddb-524e-b475-50409776d068",
+      "name": "Upsert CRM row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1680,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a7ed1046-0258-56b8-8c94-c6eed541d81a",
+              "leftValue": "={{ $('Enrich and score').item.json.output.icp_fit }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              },
+              "rightValue": "={{ $('Config').first().json.fit_threshold }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1bd4ed68-4327-552c-980c-3b31a3e73f72",
+      "name": "Strong fit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Config').first().json.slack_channel_id }}"
+        },
+        "text": "=:dart: New lead {{ $('Normalize lead').first().json.name }} <{{ $('Normalize lead').first().json.email }}> fit {{ $('Enrich and score').item.json.output.icp_fit }}/100\n{{ $('Enrich and score').item.json.output.company_summary }}\nNext: {{ $('Enrich and score').item.json.output.next_step }}",
+        "otherOptions": {}
+      },
+      "id": "e6fecc0e-8e6a-577b-87a7-e65dc83c0aed",
+      "name": "Alert Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        2160,
+        -200
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Enrich and score - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Enrich and score",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich and score - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Enrich and score",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Normalize lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize lead": {
+      "main": [
+        [
+          {
+            "node": "Has a website?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has a website?": {
+      "main": [
+        [
+          {
+            "node": "Fetch homepage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enrich and score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch homepage": {
+      "main": [
+        [
+          {
+            "node": "Homepage to text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Homepage to text": {
+      "main": [
+        [
+          {
+            "node": "Enrich and score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich and score": {
+      "main": [
+        [
+          {
+            "node": "Upsert CRM row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert CRM row": {
+      "main": [
+        [
+          {
+            "node": "Strong fit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strong fit?": {
+      "main": [
+        [
+          {
+            "node": "Alert Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "growth"
+    }
+  ]
+}

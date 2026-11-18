@@ -1,0 +1,573 @@
+{
+  "name": "Chatwoot RAG agent (Qdrant + Postgres memory) with handoff",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Chatwoot RAG agent (original)\nSame handoff contract as `chatwoot-ai-support-agent`, but the knowledge base is a **Qdrant** collection (fill it with `chatwoot-kb-ingest-qdrant`) and memory lives in **Postgres**, both from the n8n self-hosted AI starter kit.\nSwap the OpenAI model/embeddings for Ollama nodes to run fully local.",
+        "height": 260,
+        "width": 520
+      },
+      "id": "22a92e66-e05b-52ea-8f1e-4106a239a35a",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chatwoot-rag-agent",
+        "options": {}
+      },
+      "id": "f7240658-379b-5527-94ad-beb87dee42cf",
+      "name": "Chatwoot webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "7fdfebf6-23a9-5122-9b33-c3d4a4bae9d6"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8798da47-b10a-5f6f-b3da-546ea91f8ace",
+              "name": "chatwoot_url",
+              "value": "http://chatwoot:3000",
+              "type": "string"
+            },
+            {
+              "id": "5a622b42-21ab-5985-a184-0ea3dab7347c",
+              "name": "company_name",
+              "value": "Acme",
+              "type": "string"
+            },
+            {
+              "id": "89ba2b54-f438-51da-a878-31defe9db25b",
+              "name": "confidence_threshold",
+              "value": 0.75,
+              "type": "number"
+            },
+            {
+              "id": "6cf9e20b-79f6-5193-9508-29cc1588a6d3",
+              "name": "only_when_pending",
+              "value": true,
+              "type": "boolean"
+            },
+            {
+              "id": "6bde9b16-e7c9-5994-9f98-94c25bc4617d",
+              "name": "handoff_label",
+              "value": "ai-handoff",
+              "type": "string"
+            },
+            {
+              "id": "0d8113e0-513f-5ba6-b34a-ea643ff4e8eb",
+              "name": "handoff_message",
+              "value": "Thanks, I'm passing this to a teammate who can help. You'll hear back here shortly.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "8b180faa-695f-52d0-88cf-7bf829d93bc5",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Decide whether the AI should answer this Chatwoot event. Returns no items (stops) when it should not.\nconst cfg = $('Config').first().json;\nconst b = $input.first().json.body || {};\nconst conv = b.conversation || {};\nconst labels = conv.labels || [];\nconst skip = [];\nif (b.event !== 'message_created') skip.push('event is ' + b.event);\nif (b.message_type !== 'incoming') skip.push('not an incoming customer message');\nif (b.private) skip.push('private note');\nif (!b.content || !String(b.content).trim()) skip.push('empty message');\nif (labels.includes(cfg.handoff_label)) skip.push('already handed off to a human');\nif (cfg.only_when_pending && conv.status && conv.status !== 'pending') skip.push('conversation is ' + conv.status + ', a human owns it');\nif (skip.length) {\n  console.log('Skipping Chatwoot event: ' + skip.join('; '));\n  return [];\n}\nreturn [{ json: {\n  account_id: (b.account && b.account.id) || conv.account_id,\n  conversation_id: conv.id || (b.conversation && b.conversation.display_id),\n  inbox_id: b.inbox && b.inbox.id,\n  message: String(b.content).slice(0, 4000),\n  contact_name: (b.sender && b.sender.name) || '',\n  channel: conv.channel || ''\n} }];"
+      },
+      "id": "814052e6-8836-584b-a312-f7d00766071e",
+      "name": "Should the bot answer?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=You are the first-line support assistant for {{ $('Config').first().json.company_name }}.\nUse the knowledge_base tool for every product question and answer only from what it returns.\nIf the tool returns nothing relevant, set needs_human=true and confidence below 0.5.\nAlways set needs_human=true for refunds, billing disputes, cancellations, legal/privacy requests, account access, or an upset customer.\nReply in the customer's language, under 120 words, no made-up links or prices.",
+          "maxIterations": 5
+        }
+      },
+      "id": "431364d3-0db7-5ad3-bdfd-b16c4329fddb",
+      "name": "Support agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "b66bb02d-9f0d-5e46-b51d-617df5b4dad9",
+      "name": "Chat model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        576,
+        240
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ 'chatwoot-' + $('Should the bot answer?').first().json.conversation_id }}",
+        "contextWindowLength": 12
+      },
+      "id": "72419aa2-10c2-5a51-ad59-2b3450d7bfbd",
+      "name": "Conversation memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        720,
+        240
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Postgres (chat memory)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolName": "knowledge_base",
+        "toolDescription": "Search the company help center and FAQ. Use for every product, pricing, setup or policy question.",
+        "qdrantCollection": {
+          "__rl": true,
+          "mode": "id",
+          "value": "support_kb"
+        },
+        "topK": 5,
+        "options": {}
+      },
+      "id": "7911d882-5214-59e3-bc7a-35ab003661e7",
+      "name": "knowledge_base",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        864,
+        240
+      ],
+      "credentials": {
+        "qdrantApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Qdrant (local: http://qdrant:6333)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "6a92f2d9-87b4-59a4-84c2-1c33adda542e",
+      "name": "Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        864,
+        480
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"answer\": {\n      \"type\": \"string\",\n      \"description\": \"Reply to send to the customer, in their language, under 120 words\"\n    },\n    \"confidence\": {\n      \"type\": \"number\",\n      \"description\": \"0 to 1. How sure you are the answer is fully supported by the knowledge base\"\n    },\n    \"needs_human\": {\n      \"type\": \"boolean\",\n      \"description\": \"true for refunds, billing disputes, legal, angry customers, account access, or anything not covered by the knowledge base\"\n    },\n    \"reason\": {\n      \"type\": \"string\",\n      \"description\": \"One sentence for the human agent explaining the decision\"\n    },\n    \"topic\": {\n      \"type\": \"string\",\n      \"description\": \"Short topic label, e.g. billing, onboarding, bug\"\n    }\n  },\n  \"required\": [\n    \"answer\",\n    \"confidence\",\n    \"needs_human\",\n    \"reason\",\n    \"topic\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "81bfde9c-bd34-5ec6-92d2-3eeb9b5d9fb2",
+      "name": "Answer format",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1008,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d945afd4-2ca5-5f41-81e5-0bd0d9c510ff",
+              "leftValue": "={{ $json.output.confidence }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              },
+              "rightValue": "={{ $('Config').first().json.confidence_threshold }}"
+            },
+            {
+              "id": "8d8f0832-f0ba-519c-bddb-144f0baccc86",
+              "leftValue": "={{ $json.output.needs_human }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "917852a3-d9f8-589a-99c7-71ae0e88f55a",
+      "name": "Confident enough?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.chatwoot_url }}/api/v1/accounts/{{ $('Should the bot answer?').first().json.account_id }}/conversations/{{ $('Should the bot answer?').first().json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.output.answer, message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      },
+      "id": "2fdba90d-ede0-5dd1-bcfd-61c4167f59c2",
+      "name": "Send AI reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        -200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Header Auth (set in n8n)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.chatwoot_url }}/api/v1/accounts/{{ $('Should the bot answer?').first().json.account_id }}/conversations/{{ $('Should the bot answer?').first().json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $('Config').first().json.handoff_message, message_type: 'outgoing', private: false }) }}",
+        "options": {}
+      },
+      "id": "2b389e5a-d0c7-5c04-be14-56d0e0e4e082",
+      "name": "Tell customer a human is coming",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Header Auth (set in n8n)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.chatwoot_url }}/api/v1/accounts/{{ $('Should the bot answer?').first().json.account_id }}/conversations/{{ $('Should the bot answer?').first().json.conversation_id }}/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ private: true, message_type: 'outgoing', content: 'AI handoff: ' + $('Support agent').item.json.output.reason + '\\n\\nDraft (not sent): ' + $('Support agent').item.json.output.answer }) }}",
+        "options": {}
+      },
+      "id": "6dc8e3fb-8833-5ed7-9d4a-1b5325d0834c",
+      "name": "Private note for the agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Header Auth (set in n8n)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.chatwoot_url }}/api/v1/accounts/{{ $('Should the bot answer?').first().json.account_id }}/conversations/{{ $('Should the bot answer?').first().json.conversation_id }}/labels",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ labels: [$('Config').first().json.handoff_label] }) }}",
+        "options": {}
+      },
+      "id": "5b5fd4ef-b4ce-519a-9991-3571a314c41d",
+      "name": "Add handoff label",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Header Auth (set in n8n)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.chatwoot_url }}/api/v1/accounts/{{ $('Should the bot answer?').first().json.account_id }}/conversations/{{ $('Should the bot answer?').first().json.conversation_id }}/toggle_status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'open' }) }}",
+        "options": {}
+      },
+      "id": "17d46c7d-95be-5b5d-bba9-13536e08ff85",
+      "name": "Open conversation for humans",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Header Auth (set in n8n)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chat model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Support agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conversation memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Support agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "knowledge_base": {
+      "ai_tool": [
+        [
+          {
+            "node": "Support agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "knowledge_base",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer format": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Support agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chatwoot webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Should the bot answer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should the bot answer?": {
+      "main": [
+        [
+          {
+            "node": "Support agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Support agent": {
+      "main": [
+        [
+          {
+            "node": "Confident enough?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confident enough?": {
+      "main": [
+        [
+          {
+            "node": "Send AI reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tell customer a human is coming",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tell customer a human is coming": {
+      "main": [
+        [
+          {
+            "node": "Private note for the agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Private note for the agent": {
+      "main": [
+        [
+          {
+            "node": "Add handoff label",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add handoff label": {
+      "main": [
+        [
+          {
+            "node": "Open conversation for humans",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "chatwoot"
+    }
+  ]
+}

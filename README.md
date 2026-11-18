@@ -74,6 +74,14 @@ Open [`post-eval-app/index.html`](post-eval-app/index.html) directly in any brow
 
 ---
 
+## Workflows
+
+Importable automations that run the skills: a Chatwoot + n8n AI support agent with human handoff, ElevenLabs voice flows (dictation to tasks, post to voiceover, voice-agent tools), and startup-ops workflows such as a post-eval publishing gate, lead enrichment, Gmail-draft outreach, feedback triage, a weekly metrics digest, market monitoring and job alerts. There are 27 n8n workflows and 11 Activepieces build guides. Drafts are never auto-sent, and irreversible steps need human approval.
+
+See [workflows/README.md](workflows/README.md) for the index, import steps and self-hosting quickstart, and [workflows/CREDITS.md](workflows/CREDITS.md) for sources and licenses. Validate with `python workflows/tools/validate_workflows.py`.
+
+---
+
 ## Anatomy of a Skill
 
 Each skill lives at `skills/<category>/<skill-name>/SKILL.md` and implements the required 8-section contract:

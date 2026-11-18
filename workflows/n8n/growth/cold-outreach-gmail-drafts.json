@@ -1,0 +1,623 @@
+{
+  "name": "Cold outreach: research each lead and write Gmail drafts (never sends)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Cold outreach drafts (original)\nReads a `leads` sheet (email, first_name, company, website, notes, status, do_not_contact). For up to `max_per_run` rows with an empty status it reads the website, writes a short personalised email and saves it as a **Gmail draft**. Then marks the row `drafted` or `needs_research`.\nThere is no send node. You review and send from Gmail.",
+        "height": 260,
+        "width": 520
+      },
+      "id": "ec10fbb4-3adb-5169-b78d-21e3c6535e58",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "8692cbc6-832a-51ce-83bd-e8f2fecaeee9",
+      "name": "Run now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "triggerAtHour": 8,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "561b3d42-65f9-5bc4-bb09-b35561935074",
+      "name": "Weekdays 08:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4cbeadf0-673d-56fd-955e-4e07eeacdedc",
+              "name": "sheet_url",
+              "value": "https://docs.google.com/spreadsheets/d/REPLACE_WITH_SHEET_ID/edit",
+              "type": "string"
+            },
+            {
+              "id": "bc188c0c-a7c3-5e81-8f79-2e2184070efe",
+              "name": "sender_name",
+              "value": "Your Name",
+              "type": "string"
+            },
+            {
+              "id": "bff8144f-01e6-5d32-983f-e0ccb5300376",
+              "name": "offer",
+              "value": "A 2-week fixed-price sprint that ships one AI automation into production",
+              "type": "string"
+            },
+            {
+              "id": "1a177c5b-463b-5947-b8cc-bb2942ed42e1",
+              "name": "proof",
+              "value": "Link to one case study or repo that shows the result",
+              "type": "string"
+            },
+            {
+              "id": "6dd7f729-7ca6-54c6-a395-89f9f7582d08",
+              "name": "max_per_run",
+              "value": 10,
+              "type": "number"
+            },
+            {
+              "id": "9a5ed994-66dd-598b-bcb3-196405f9727c",
+              "name": "min_confidence",
+              "value": 0.6,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "20eece79-93a2-56b1-b9ce-ea7c62c2eb53",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "leads"
+        },
+        "options": {}
+      },
+      "id": "ec8dbfa4-842b-563d-9470-089e26200a32",
+      "name": "Read leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst rows = $input.all().map(i => i.json)\n  .filter(r => r.email && !String(r.status || '').trim() && String(r.do_not_contact || '').toLowerCase() !== 'yes')\n  .slice(0, Number(cfg.max_per_run || 10));\nreturn rows.map(r => ({ json: { ...r, website: r.website ? (/^https?:\\/\\//.test(r.website) ? r.website : 'https://' + r.website) : '' } }));"
+      },
+      "id": "5a2f8148-6bea-5b5c-856e-8a6adf6fd8c1",
+      "name": "Pick leads to draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.website || 'https://no-website.invalid' }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "1159e121-b1f4-55d2-9c33-c8166be45dca",
+      "name": "Fetch website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const lead = $('Pick leads to draft').item.json;\nconst html = String($json.data || '');\nconst text = html.replace(/<script[\\s\\S]*?<\\/script>/gi, ' ').replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().slice(0, 5000);\nreturn { json: { ...lead, site_text: text } };"
+      },
+      "id": "d5ca394e-77c4-5736-9e2f-3e8cba4b7f44",
+      "name": "Website to text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=First name: {{ $json.first_name || 'there' }}\nCompany: {{ $json.company }}\nNotes: {{ $json.notes || 'none' }}\nWebsite text:\n{{ $json.site_text || 'not available' }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You write one cold email from {{ $('Config').first().json.sender_name }}. Offer: {{ $('Config').first().json.offer }}. Proof: {{ $('Config').first().json.proof }}.\nRules: under 110 words, plain text, one specific observation about their company taken from the website text or notes (quote the fact in personalization_fact), one clear ask (a 15-minute call), no flattery, no fake familiarity, no links except the proof.\nconfidence (0-1) = how sure you are the personal observation is accurate. If the website text is empty or generic, confidence must be below 0.5."
+            }
+          ]
+        }
+      },
+      "id": "be0e6e55-2025-58da-9aee-57761ef4f36a",
+      "name": "Draft email",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "4d5fdebf-3093-5b0e-bc3f-2187517d907a",
+      "name": "Draft email - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1368,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"subject\": {\n      \"type\": \"string\"\n    },\n    \"body\": {\n      \"type\": \"string\"\n    },\n    \"personalization_fact\": {\n      \"type\": \"string\"\n    },\n    \"confidence\": {\n      \"type\": \"number\"\n    }\n  },\n  \"required\": [\n    \"subject\",\n    \"body\",\n    \"personalization_fact\",\n    \"confidence\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "5400dd02-0aaf-567a-a724-595f7cadb155",
+      "name": "Draft email - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "dbceb099-6efd-5034-8c8a-4bd0256d7d29",
+              "leftValue": "={{ $json.output.confidence }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              },
+              "rightValue": "={{ $('Config').first().json.min_confidence }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "31f9543a-4a21-53dd-8d93-f84d1732e419",
+      "name": "Good enough to draft?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "operation": "create",
+        "subject": "={{ $json.output.subject }}",
+        "message": "={{ $json.output.body }}\n\n{{ $('Config').first().json.sender_name }}",
+        "emailType": "text",
+        "options": {
+          "sendTo": "={{ $('Website to text').item.json.email }}"
+        }
+      },
+      "id": "1bb5c573-2254-5304-9c22-1756fe26ad93",
+      "name": "Create Gmail draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1920,
+        -200
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "leads"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $('Website to text').item.json.email }}",
+            "status": "drafted",
+            "drafted_at": "={{ $now.toISO() }}",
+            "personalization": "={{ $('Draft email').item.json.output.personalization_fact }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "drafted_at",
+              "displayName": "drafted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "personalization",
+              "displayName": "personalization",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "e8a76225-0ea0-5d86-905b-c41b60614b04",
+      "name": "Mark drafted",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2160,
+        -200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Config').first().json.sheet_url }}"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "leads"
+        },
+        "options": {},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email": "={{ $('Website to text').item.json.email }}",
+            "status": "needs_research",
+            "drafted_at": "={{ $now.toISO() }}"
+          },
+          "matchingColumns": [
+            "email"
+          ],
+          "schema": [
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "drafted_at",
+              "displayName": "drafted_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        }
+      },
+      "id": "c1c2bf40-5833-5a93-ac13-bb4da580e55b",
+      "name": "Mark needs research",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1920,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Draft email - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Draft email",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft email - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Draft email",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run now": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekdays 08:30": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Read leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read leads": {
+      "main": [
+        [
+          {
+            "node": "Pick leads to draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick leads to draft": {
+      "main": [
+        [
+          {
+            "node": "Fetch website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch website": {
+      "main": [
+        [
+          {
+            "node": "Website to text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Website to text": {
+      "main": [
+        [
+          {
+            "node": "Draft email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft email": {
+      "main": [
+        [
+          {
+            "node": "Good enough to draft?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Good enough to draft?": {
+      "main": [
+        [
+          {
+            "node": "Create Gmail draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark needs research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Gmail draft": {
+      "main": [
+        [
+          {
+            "node": "Mark drafted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "growth"
+    }
+  ]
+}

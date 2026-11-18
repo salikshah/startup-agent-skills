@@ -1,0 +1,402 @@
+{
+  "name": "Market monitor: RSS feeds -> dedupe -> keyword + LLM relevance -> Telegram digest",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Market / competitor monitor (original)\nEvery 6 hours: read your feeds (competitor blogs, Google News RSS queries, HN, subreddits `.rss`), drop items seen before, keep keyword matches from the last 72h, let an LLM score relevance to *your* market, and send one Telegram digest with a content angle per item.",
+        "height": 240,
+        "width": 500
+      },
+      "id": "7ab9263c-7dee-5aac-b8e3-6bf024d53c6e",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "056b8f47-c439-59e7-ba16-47a133e20f4c",
+      "name": "Every 6 hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "51298817-e1aa-536c-8e98-479b064b09cd",
+              "name": "feeds",
+              "value": "={{ [\"https://news.google.com/rss/search?q=%22AI+agents%22+startup&hl=en-GB&gl=GB&ceid=GB:en\", \"https://hnrss.org/newest?points=50\", \"https://www.reddit.com/r/SaaS/.rss\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "2c090e9a-250c-50ec-bcb1-c83ff5b784d7",
+              "name": "keywords",
+              "value": "={{ [\"agent\", \"automation\", \"open source\", \"pricing\", \"launch\", \"funding\"] }}",
+              "type": "array"
+            },
+            {
+              "id": "69b8e927-1f53-57d1-8c4b-3f23639b590b",
+              "name": "market",
+              "value": "Open-source AI agent tooling for developers and small startups",
+              "type": "string"
+            },
+            {
+              "id": "e3f2eb2c-9956-54f1-b1d0-afab68d48e21",
+              "name": "min_score",
+              "value": 7,
+              "type": "number"
+            },
+            {
+              "id": "f6af953a-9a18-5ff9-9808-2a90bc88f304",
+              "name": "max_age_hours",
+              "value": 72,
+              "type": "number"
+            },
+            {
+              "id": "844274a7-9458-5cda-903f-e1435f1ff925",
+              "name": "telegram_chat_id",
+              "value": "REPLACE_WITH_YOUR_TELEGRAM_CHAT_ID",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a2464b91-bda4-5baa-9f88-f0dd5b0081ab",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nreturn cfg.feeds.map(url => ({ json: { feed_url: url } }));"
+      },
+      "id": "95aec02c-0587-54b0-900f-6c9cc891b8c7",
+      "name": "One item per feed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.feed_url }}",
+        "options": {}
+      },
+      "id": "4110998d-e595-5b26-b71e-f8d3ba9b5d36",
+      "name": "Read feed",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        720,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "removeItemsSeenInPreviousExecutions",
+        "dedupeValue": "={{ $json.link }}",
+        "options": {}
+      },
+      "id": "651558aa-d2f3-517a-8d10-415127d611eb",
+      "name": "Skip items seen before",
+      "type": "n8n-nodes-base.removeDuplicates",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst kws = cfg.keywords.map(k => k.toLowerCase());\nconst maxAge = Date.now() - Number(cfg.max_age_hours || 72) * 3600 * 1000;\nreturn $input.all().filter(i => {\n  const j = i.json;\n  const t = ((j.title || '') + ' ' + (j.contentSnippet || j.content || '')).toLowerCase();\n  const d = Date.parse(j.isoDate || j.pubDate || '') || Date.now();\n  return d >= maxAge && (kws.length === 0 || kws.some(k => t.includes(k)));\n}).map(i => ({ json: { title: i.json.title, link: i.json.link, date: i.json.isoDate || i.json.pubDate || '', snippet: String(i.json.contentSnippet || '').slice(0, 800) } }));"
+      },
+      "id": "033db97b-4fd8-513e-8f67-4023697a1931",
+      "name": "Keyword and recency filter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "maxItems": 25
+      },
+      "id": "9453870d-874b-5170-bb7e-cc166a2f4de9",
+      "name": "Cap items",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Title: {{ $json.title }}\nSnippet: {{ $json.snippet }}\nLink: {{ $json.link }}",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=You screen news for a founder. Market: {{ $('Config').first().json.market }}.\nscore 0-10: 10 = directly changes our positioning, pricing or roadmap; 7 = worth reading today; below 5 = noise. why = one sentence. content_angle = one specific post idea we could write in response (or 'none')."
+            }
+          ]
+        }
+      },
+      "id": "4b7215e5-86cd-5406-b01d-aa6260d8436b",
+      "name": "Score relevance",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [
+        1680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "383e5a55-5e8f-57aa-92d0-0dc2a53bd8ca",
+      "name": "Score relevance - model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1608,
+        200
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "OpenAI (or OpenAI-compatible) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"score\": {\n      \"type\": \"number\"\n    },\n    \"why\": {\n      \"type\": \"string\"\n    },\n    \"content_angle\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"score\",\n    \"why\",\n    \"content_angle\"\n  ],\n  \"additionalProperties\": false\n}"
+      },
+      "id": "5ad6f461-da57-50d1-beb6-b8b9c5640476",
+      "name": "Score relevance - JSON schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1800,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst src = $('Cap items').all();\nconst keep = $input.all().map((it, i) => ({ ...src[i].json, ...it.json.output }))\n  .filter(x => Number(x.score) >= Number(cfg.min_score))\n  .sort((a, b) => b.score - a.score);\nif (!keep.length) return [];\nconst text = 'Market watch: ' + keep.length + ' relevant item(s)\\n\\n' + keep.map(x => '[' + x.score + '/10] ' + x.title + '\\n' + x.why + '\\nAngle: ' + x.content_angle + '\\n' + x.link).join('\\n\\n');\nreturn [{ json: { text: text.slice(0, 4000) } }];"
+      },
+      "id": "00974020-2668-5631-a261-de250cef4704",
+      "name": "Keep relevant and format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Config').first().json.telegram_chat_id }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "f15a084f-0a41-51de-b2e6-14205235441c",
+      "name": "Send digest",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2160,
+        0
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Score relevance - model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Score relevance",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score relevance - JSON schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Score relevance",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 6 hours": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "One item per feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One item per feed": {
+      "main": [
+        [
+          {
+            "node": "Read feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read feed": {
+      "main": [
+        [
+          {
+            "node": "Skip items seen before",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip items seen before": {
+      "main": [
+        [
+          {
+            "node": "Keyword and recency filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keyword and recency filter": {
+      "main": [
+        [
+          {
+            "node": "Cap items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cap items": {
+      "main": [
+        [
+          {
+            "node": "Score relevance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score relevance": {
+      "main": [
+        [
+          {
+            "node": "Keep relevant and format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep relevant and format": {
+      "main": [
+        [
+          {
+            "node": "Send digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "ops"
+    }
+  ]
+}

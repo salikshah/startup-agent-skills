@@ -1,0 +1,220 @@
+{
+  "name": "ElevenLabs: post or script to voiceover MP3",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Post -> voiceover (original)\nPOST `{ \"text\": \"...\", \"voice_id\": \"optional\" }` and get an MP3 back.\nCleans social-post text (links, hashtags, emoji) before sending it to ElevenLabs text-to-speech.\nCredential: Header Auth named `xi-api-key`.",
+        "height": 220,
+        "width": 460
+      },
+      "id": "74bad15b-5fd1-5d5c-a45b-cf73c9cc2699",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "voiceover",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "25fed7de-4521-573b-a281-52b5a0ded2b0",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "78ef2e8b-c021-593b-bc40-a054f20247ea"
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8396e482-6fa5-5ce7-b6fe-91cac1d6a4f0",
+              "name": "voice_id",
+              "value": "21m00Tcm4TlvDq8ikWAM",
+              "type": "string"
+            },
+            {
+              "id": "be2ba331-c0c7-5d03-b59d-a24fe5743040",
+              "name": "model_id",
+              "value": "eleven_multilingual_v2",
+              "type": "string"
+            },
+            {
+              "id": "861064ed-a227-54a4-967f-fa721ee62a92",
+              "name": "output_format",
+              "value": "mp3_44100_128",
+              "type": "string"
+            },
+            {
+              "id": "3dcff24e-a17d-57e9-8197-50a257c057fb",
+              "name": "max_chars",
+              "value": 4500,
+              "type": "number"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "43fe81a1-641c-5094-9af9-4004a8d4b4c3",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Make social-post text speakable: drop URLs, hashtags, emoji, markdown.\nconst cfg = $('Config').first().json;\nconst b = $input.first().json.body || {};\nlet t = String(b.text || '').trim();\nif (!t) throw new Error('Send JSON with a \"text\" field.');\nt = t.replace(/https?:\\/\\/\\S+/g, '')\n     .replace(/#(\\w+)/g, '$1')\n     .replace(/[*_`>#]+/g, '')\n     .replace(/[\\u{1F300}-\\u{1FAFF}\\u{2600}-\\u{27BF}]/gu, '')\n     .replace(/\\n{2,}/g, '\\n\\n').replace(/[ \\t]+/g, ' ').trim();\nconst max = Number(cfg.max_chars || 4500);\nif (t.length > max) throw new Error('Text is ' + t.length + ' characters; limit is ' + max + '. Split it first.');\nreturn [{ json: { script: t, voice_id: b.voice_id || cfg.voice_id, title: b.title || 'voiceover' } }];"
+      },
+      "id": "8246856f-c2b9-5436-b983-58ce1ff35fff",
+      "name": "Make it speakable",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.elevenlabs.io/v1/text-to-speech/{{ $json.voice_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "output_format",
+              "value": "={{ $('Config').first().json.output_format }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.script, model_id: $('Config').first().json.model_id, voice_settings: { stability: 0.5, similarity_boost: 0.75 } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "id": "0cdc2daf-94d6-51df-9d7c-c1aa85851d6d",
+      "name": "ElevenLabs text to speech",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Header Auth (set in n8n)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "binary",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Disposition",
+                "value": "=attachment; filename=\"{{ $('Make it speakable').first().json.title }}.mp3\""
+              }
+            ]
+          }
+        }
+      },
+      "id": "147356dd-7b4b-5287-a256-c56806c7b0e5",
+      "name": "Return MP3",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Make it speakable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Make it speakable": {
+      "main": [
+        [
+          {
+            "node": "ElevenLabs text to speech",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ElevenLabs text to speech": {
+      "main": [
+        [
+          {
+            "node": "Return MP3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    {
+      "name": "startup-agent-skills"
+    },
+    {
+      "name": "voice"
+    }
+  ]
+}
